@@ -1,119 +1,64 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
+import Tasks from "./pages/Tasks";
+import ClientDashboard from "./pages/client/ClientDashboard";
+import WorkerDashboard from "./pages/worker/WorkerDashboard";
+import FindTasks from "./pages/worker/FindTasks";
+import CreateTask from "./pages/client/CreateTask";
+import MyTasks from "./pages/client/MyTasks";
+import Favorites from "./pages/client/Favorites";
+import ClientSettings from "./pages/client/Settings";
+import WorkerSettings from "./pages/worker/Settings";
+import Messages from "./pages/Messages";
+import NotFound from "./pages/NotFound";
+import Profile from "./pages/Profile";
 
-// Layouts
-import MainLayout from './layouts/MainLayout';
-import AuthLayout from './layouts/AuthLayout';
+import TalkWithUs from "./pages/TalkWithUs";
 
-// Pages
-import TaskLinkLanding from './pages/TaskLinkLanding';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Tasks from './pages/Tasks';
-import TaskDetail from './pages/TaskDetail';
-import CreateTask from './pages/CreateTask';
-import Messages from './pages/Messages';
-import Profile from './pages/Profile';
-import EditProfile from './pages/EditProfile';
-import TaskMap from './pages/TaskMap';
-import Reviews from './pages/Reviews';
-import Admin from './pages/Admin';
-import Notifications from './pages/Notifications';
-import Workers from './pages/Workers';
+import TaskDetails from "./pages/TaskDetail";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import { ThemeProvider } from "@/components/hooks/use-theme";
 
+const queryClient = new QueryClient();
 
-
-// Protected Route Component
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return children;
-};
-
-// Public Route Component (redirect if already authenticated)
-const PublicRoute = ({ children }) => {
-  const { isAuthenticated } = useSelector((state) => state.auth);
-  const location = useLocation();
-
-  // Allow register if ?role= param present (fresh registration intent), even if stale localStorage
-  const isRegisterIntent = location.pathname === '/register' && location.search.includes('?role=');
-  if (isAuthenticated && !isRegisterIntent) {
-    return <Navigate to="/dashboard" replace />;
-  }
-
-  return children;
-};
-
-function App() {
-  return (
-    <Router>
-      <Routes>
-        {/* Landing Page - Public */}
-        <Route path="/" element={<TaskLinkLanding />} />
-
-        {/* Auth Routes */}
-        <Route element={<PublicRoute><AuthLayout /></PublicRoute>}>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-        </Route>
-
-        {/* Protected Routes */}
-        <Route element={
-          <ProtectedRoute>
-            <MainLayout />
-          </ProtectedRoute>
-        }>
-          {/* Common Routes */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/tasks" element={<Tasks />} />
-          <Route path="/tasks/create" element={
-            <ProtectedRoute allowedRoles={['client']}>
-              <CreateTask />
-            </ProtectedRoute>
-          } />
-          <Route path="/tasks/edit/:id" element={
-            <ProtectedRoute allowedRoles={['client']}>
-              <CreateTask isEdit />
-            </ProtectedRoute>
-          } />
-          <Route path="/tasks/:id" element={<TaskDetail />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/profile/:id" element={<Profile />} />
-          <Route path="/edit-profile/:id" element={<EditProfile />} />
-
-          <Route path="/map" element={<TaskMap />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/reviews" element={<Reviews />} />
-          <Route path="/workers" element={
-            <ProtectedRoute allowedRoles={['client']}>
-              <Workers />
-            </ProtectedRoute>
-          } />
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <Admin />
-            </ProtectedRoute>
-          } />
-        </Route>
-
-        {/* Default Redirect */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes>
-    </Router>
-  );
-}
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/tasks" element={<Tasks />} />
+            <Route path="/tasks/:id" element={<TaskDetails />} />
+            <Route path="/client/dashboard" element={<ClientDashboard />} />
+            <Route path="/client/tasks" element={<MyTasks />} />
+            <Route path="/client/tasks/new" element={<CreateTask />} />
+            <Route path="/client/favorites" element={<Favorites />} />
+            <Route path="/client/settings" element={<ClientSettings />} />
+            <Route path="/worker/dashboard" element={<WorkerDashboard />} />
+            <Route path="/worker/tasks" element={<FindTasks />} />
+            <Route path="/worker/settings" element={<WorkerSettings />} />
+            <Route path="/client/messages" element={<Messages />} />
+            <Route path="/worker/messages" element={<Messages />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/talk-with-us" element={<TalkWithUs />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
+);
 
 export default App;
 

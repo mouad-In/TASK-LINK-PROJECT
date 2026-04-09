@@ -7,6 +7,14 @@ import messagesReducer from '../features/messages/messagesSlice';
 import reviewsReducer from '../features/reviews/reviewsSlice';
 import notificationsReducer from '../features/notifications/notificationsSlice';
 import commentsReducer from '../features/comments/commentsSlice';
+import landingReducer from '../features/landing/landingSlice';
+import profileReducer from '../features/profile/profileSlice';
+import clientReducer from '../features/client/clientSlice';
+import workerReducer from '../features/worker/workerSlice';
+import favoritesReducer from '../features/favorite/favoritesSlice';
+import adminReducer from '../features/admin/adminSlice';
+import contactReducer from '../features/contact/contactSlice';
+import settingsReducer from '@/features/settings/settingsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -18,6 +26,13 @@ export const store = configureStore({
     comments: commentsReducer,
     messages: messagesReducer,
     reviews: reviewsReducer,
+    landing: landingReducer,
+    profile: profileReducer,
+    client: clientReducer,
+    worker: workerReducer,
+    favorites: favoritesReducer,
+    admin: adminReducer,
+    contact: contactReducer,
+    settings: settingsReducer,
   },
 });
-

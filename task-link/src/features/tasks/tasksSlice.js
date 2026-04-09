@@ -1,117 +1,156 @@
+// src/store/tasks/tasksSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { taskService } from '../../services/api';
+import { taskService } from '@/services/api';
 import { addToast } from '../notifications/notificationsSlice';
 
+// ── Initial State ─────────────────────────────────────────────────────────────
+
 const initialState = {
-  tasks: [],
-  currentTask: null,
-  filteredTasks: [],
-  isLoading: false,
-  error: null,
+  tasks:        [],
+  currentTask:  null,
+  filteredTasks:[],
+  isLoading:    false,
+  error:        null,
+  // Pagination meta from Laravel paginator
+  pagination: {
+    currentPage: 1,
+    lastPage:    1,
+    total:       0,
+    perPage:     20,
+  },
   filters: {
-    category: '',
+    category:  '',
     minBudget: '',
     maxBudget: '',
-    urgency: '',
-    status: '',
-    search: '',
+    urgency:   '',
+    status:    '',
+    search:    '',
   },
 };
 
-// Async thunks
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Normalize Laravel snake_case → camelCase for the frontend.
+ * Laravel sends: budget_type, full_description, posted_at, applications_count
+ */
+const normalize = (task) => ({
+  ...task,
+  budgetType:        task.budget_type        ?? task.budgetType        ?? 'Fixed Price',
+  fullDescription:   task.full_description   ?? task.fullDescription   ?? '',
+  postedAt:          task.posted_at          ?? task.postedAt          ?? '',
+  applicationsCount: task.applications_count ?? task.applicationsCount
+                      ?? task.applications?.length ?? 0,
+});
+
+const applyFilters = (tasks, filters) => {
+  const { category, minBudget, maxBudget, urgency, status, search } = filters;
+  return tasks.filter((t) =>
+    (!category  || t.category === category) &&
+    (!minBudget || t.budget   >= parseInt(minBudget, 10)) &&
+    (!maxBudget || t.budget   <= parseInt(maxBudget, 10)) &&
+    (!urgency   || t.urgency  === urgency) &&
+    (!status    || t.status   === status) &&
+    (!search    ||
+      t.title.toLowerCase().includes(search.toLowerCase()) ||
+      t.description.toLowerCase().includes(search.toLowerCase()))
+  );
+};
+
+// ── Async Thunks ──────────────────────────────────────────────────────────────
+
+/** GET /api/tasks  — pass filters as params to let Laravel filter server-side */
 export const fetchTasks = createAsyncThunk(
   'tasks/fetchTasks',
-  async (_, thunkAPI) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const data = await taskService.getAllTasks();
-      return data;
+      return await taskService.getAllTasks(params);
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
+/** GET /api/tasks/:id */
 export const fetchTaskById = createAsyncThunk(
   'tasks/fetchTaskById',
-  async (taskId, thunkAPI) => {
+  async (taskId, { rejectWithValue }) => {
     try {
-      const data = await taskService.getTaskById(taskId);
-      return data;
+      return await taskService.getTaskById(taskId);
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
+/** POST /api/tasks  🔒 JWT */
 export const createTask = createAsyncThunk(
   'tasks/createTask',
-  async (taskData, thunkAPI) => {
+  async (taskData, { dispatch, rejectWithValue }) => {
     try {
       const data = await taskService.createTask(taskData);
+      dispatch(addToast({ message: 'Task created successfully!', type: 'success' }));
       return data;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
+/** PUT /api/tasks/:id  🔒 JWT */
 export const updateTask = createAsyncThunk(
   'tasks/updateTask',
-  async ({ taskId, taskData }, thunkAPI) => {
+  async ({ taskId, taskData }, { dispatch, rejectWithValue }) => {
     try {
       const data = await taskService.updateTask(taskId, taskData);
+      dispatch(addToast({ message: 'Task updated successfully!', type: 'success' }));
       return data;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
+/** DELETE /api/tasks/:id  🔒 JWT */
 export const deleteTask = createAsyncThunk(
   'tasks/deleteTask',
-  async (taskId, thunkAPI) => {
+  async (taskId, { dispatch, rejectWithValue }) => {
     try {
       await taskService.deleteTask(taskId);
+      dispatch(addToast({ message: 'Task deleted successfully!', type: 'success' }));
       return taskId;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
+/** POST /api/tasks/:id/assign  🔒 JWT */
 export const assignWorker = createAsyncThunk(
   'tasks/assignWorker',
-  async ({ taskId, workerId }, thunkAPI) => {
+  async ({ taskId, workerId }, { dispatch, rejectWithValue }) => {
     try {
       const data = await taskService.assignWorker(taskId, workerId);
+      dispatch(addToast({ message: 'Worker assigned successfully!', type: 'success' }));
       return data;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
+
+// ── Slice ─────────────────────────────────────────────────────────────────────
 
 const tasksSlice = createSlice({
   name: 'tasks',
   initialState,
   reducers: {
     setFilters: (state, action) => {
-      state.filters = { ...state.filters, ...action.payload };
-      // Apply filters
-      state.filteredTasks = state.tasks.filter((task) => {
-        const matchesCategory = !state.filters.category || task.category === state.filters.category;
-        const matchesMinBudget = !state.filters.minBudget || task.budget >= parseInt(state.filters.minBudget);
-        const matchesMaxBudget = !state.filters.maxBudget || task.budget <= parseInt(state.filters.maxBudget);
-        const matchesUrgency = !state.filters.urgency || task.urgency === state.filters.urgency;
-        const matchesStatus = !state.filters.status || task.status === state.filters.status;
-        const matchesSearch = !state.filters.search || 
-          task.title.toLowerCase().includes(state.filters.search.toLowerCase()) ||
-          task.description.toLowerCase().includes(state.filters.search.toLowerCase());
-        return matchesCategory && matchesMinBudget && matchesMaxBudget && matchesUrgency && matchesStatus && matchesSearch;
-      });
+      state.filters       = { ...state.filters, ...action.payload };
+      state.filteredTasks = applyFilters(state.tasks, state.filters);
     },
     clearFilters: (state) => {
-      state.filters = initialState.filters;
+      state.filters       = initialState.filters;
       state.filteredTasks = state.tasks;
     },
     clearCurrentTask: (state) => {
@@ -123,107 +162,115 @@ const tasksSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Tasks
+      // ── Fetch All Tasks ──────────────────────────────────────────────────
       .addCase(fetchTasks.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error     = null;
       })
       .addCase(fetchTasks.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.tasks = action.payload.map(task => ({
-          ...task,
-          applicationsCount: task.applications ? task.applications.length : 0
-        }));
-        state.filteredTasks = state.tasks;
+
+        // Handle both paginated { data[], ... } and plain array responses
+        const raw = action.payload?.data ?? action.payload ?? [];
+
+        state.tasks         = raw.map(normalize);
+        state.filteredTasks = applyFilters(state.tasks, state.filters);
+
+        // Store pagination meta if present
+        if (action.payload?.current_page) {
+          state.pagination = {
+            currentPage: action.payload.current_page,
+            lastPage:    action.payload.last_page,
+            total:       action.payload.total,
+            perPage:     action.payload.per_page,
+          };
+        }
       })
       .addCase(fetchTasks.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
+        state.error     = action.payload;
       })
-      // Fetch Task By ID
+
+      // ── Fetch Task By ID ─────────────────────────────────────────────────
       .addCase(fetchTaskById.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error     = null;
       })
       .addCase(fetchTaskById.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.currentTask = action.payload;
+        state.isLoading   = false;
+        state.currentTask = normalize(action.payload);
       })
       .addCase(fetchTaskById.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
+        state.error     = action.payload;
       })
-      // Create Task
+
+      // ── Create Task ──────────────────────────────────────────────────────
       .addCase(createTask.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error     = null;
       })
-      .addCase(createTask.fulfilled, (state, action, thunkAPI) => {
+      .addCase(createTask.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.tasks.push(action.payload);
-        state.filteredTasks.push(action.payload);
-        thunkAPI.dispatch(addToast({ message: 'Task created and published successfully!', type: 'success' }));
+        const task = normalize(action.payload);
+        state.tasks.unshift(task);  // newest first
+        state.filteredTasks = applyFilters(state.tasks, state.filters);
       })
       .addCase(createTask.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
+        state.error     = action.payload;
       })
-      // Update Task
+
+      // ── Update Task ──────────────────────────────────────────────────────
       .addCase(updateTask.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error     = null;
       })
-      .addCase(updateTask.fulfilled, (state, action, thunkAPI) => {
+      .addCase(updateTask.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.tasks = state.tasks.map((task) =>
-          task.id === action.payload.id ? action.payload : task
-        );
-        state.filteredTasks = state.filteredTasks.map((task) =>
-          task.id === action.payload.id ? action.payload : task
-        );
-        state.currentTask = action.payload;
-        thunkAPI.dispatch(addToast({ message: 'Task updated successfully!', type: 'success' }));
+        const updated = normalize(action.payload);
+        state.tasks         = state.tasks.map((t) => (t.id === updated.id ? updated : t));
+        state.filteredTasks = applyFilters(state.tasks, state.filters);
+        state.currentTask   = updated;
       })
       .addCase(updateTask.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
+        state.error     = action.payload;
       })
-      // Delete Task
+
+      // ── Delete Task ──────────────────────────────────────────────────────
       .addCase(deleteTask.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error     = null;
       })
       .addCase(deleteTask.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.tasks = state.tasks.filter((task) => task.id !== action.payload);
-        state.filteredTasks = state.filteredTasks.filter((task) => task.id !== action.payload);
+        state.isLoading     = false;
+        state.tasks         = state.tasks.filter((t) => t.id !== action.payload);
+        state.filteredTasks = applyFilters(state.tasks, state.filters);
       })
       .addCase(deleteTask.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
+        state.error     = action.payload;
       })
-      // Assign Worker
+
+      // ── Assign Worker ────────────────────────────────────────────────────
       .addCase(assignWorker.pending, (state) => {
         state.isLoading = true;
-        state.error = null;
+        state.error     = null;
       })
       .addCase(assignWorker.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.tasks = state.tasks.map((task) =>
-          task.id === action.payload.id ? action.payload : task
-        );
-        state.filteredTasks = state.filteredTasks.map((task) =>
-          task.id === action.payload.id ? action.payload : task
-        );
-        state.currentTask = action.payload;
+        const updated = normalize(action.payload);
+        state.tasks         = state.tasks.map((t) => (t.id === updated.id ? updated : t));
+        state.filteredTasks = applyFilters(state.tasks, state.filters);
+        state.currentTask   = updated;
       })
       .addCase(assignWorker.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.payload;
+        state.error     = action.payload;
       });
   },
 });
 
 export const { setFilters, clearFilters, clearCurrentTask, clearError } = tasksSlice.actions;
 export default tasksSlice.reducer;
-

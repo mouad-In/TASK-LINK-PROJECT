@@ -1,0 +1,10 @@
+export { CosmicBackground } from './CosmicBackground';
+export { HeroSection } from './HeroSection';
+export { StatsGrid } from './StatsGrid';
+export { CategorySection } from './CategorySection';
+export { HowItWorksSection } from './HowItWorksSection';
+export { TalkWithUsSection } from './TalkWithUsSection';
+export { CallToActionSection } from './CallToActionSection';
+export { TestimonialsSection } from './TestimonialsSection';
+export { ChatButton } from './ChatButton';
+export { FooterSection } from './FooterSection';

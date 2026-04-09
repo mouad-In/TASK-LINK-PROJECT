@@ -6,22 +6,27 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
+      
+
+        // Messages — Messages.jsx sends: conversationId, senderId, content
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
+
+            $table->text('content');
+            $table->boolean('is_read')->default(false);
+
+            $table->foreignId('conversation_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('sender_id')->constrained('users')->cascadeOnDelete();
+
             $table->timestamps();
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('messages');
+        
     }
 };

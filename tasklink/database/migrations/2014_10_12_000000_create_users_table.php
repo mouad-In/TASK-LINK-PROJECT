@@ -10,13 +10,23 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+
+            // Auth
             $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['client', 'worker', 'admin'])->default('client'); // ✅
-            $table->string('phone')->nullable();                                     // ✅
-            $table->string('location')->nullable();                                  // ✅
+            $table->enum('role', ['client', 'worker', 'admin'])->default('client');
+
+            // Profile — used by Register.jsx, EditProfile.jsx, Profile.jsx
+            $table->string('first_name');
+            $table->string('last_name');
+            $table->string('phone')->nullable();
+            $table->string('location')->nullable();
+
+            // Worker-only — used by Profile.jsx (skills, completedTasks, rating)
+            $table->json('skills')->nullable();          // array of strings
+            $table->integer('completed_tasks')->default(0);
+            $table->decimal('rating', 3, 2)->nullable(); // e.g. 4.85
+
             $table->rememberToken();
             $table->timestamps();
         });

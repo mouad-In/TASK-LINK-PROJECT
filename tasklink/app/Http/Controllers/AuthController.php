@@ -6,99 +6,84 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Validator;
+use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
-    public function __construct()
+    private function userResponse(mixed $user, string $token): array
     {
-        $this->middleware('auth:api')->except(['login', 'register']);
-    }
-
-    /**
-     * POST /auth/login
-     */
-    public function login(Request $request): JsonResponse
-    {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required|string',
+        return array_merge($user->toArray(), [
+            'token'    => $token,
+            'userType' => $user->role,   // ✅ أضف userType = role
         ]);
-
-        $token = auth('api')->attempt($request->only('email', 'password'));
-
-        if (!$token) {
-            throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
-            ]);
-        }
-
-        return $this->respondWithToken($token);
     }
 
-    /**
-     * POST /auth/register
-     * React يبعث: firstName, lastName, email, phone, location, password, role
-     */
     public function register(Request $request): JsonResponse
     {
-        $request->validate([
-            'firstName' => 'required|string|max:255',
-            'lastName'  => 'required|string|max:255',
+        $v = Validator::make($request->all(), [
+            'firstName' => 'required|string|max:100',
+            'lastName'  => 'required|string|max:100',
             'email'     => 'required|email|unique:users,email',
             'password'  => 'required|string|min:6',
-            'phone'     => 'sometimes|string|max:20',
-            'location'  => 'sometimes|string|max:255',
-            'role'      => 'sometimes|in:client,worker,admin',
+            'role'      => 'required|in:client,worker',
+            'phone'     => 'nullable|string|max:30',
+            'location'  => 'nullable|string|max:200',
         ]);
+
+        if ($v->fails()) {
+            return response()->json(['errors' => $v->errors()], 422);
+        }
 
         $user = User::create([
-            'name'     => $request->firstName . ' ' . $request->lastName,
-            'email'    => $request->email,
-            'password' => Hash::make($request->password),
-            'phone'    => $request->phone,
-            'location' => $request->location,
-            'role'     => $request->role ?? 'client',
+            'first_name' => $request->firstName,
+            'last_name'  => $request->lastName,
+            'email'      => $request->email,
+            'password'   => Hash::make($request->password),
+            'role'       => $request->role,
+            'phone'      => $request->phone,
+            'location'   => $request->location,
         ]);
 
-        $token = auth('api')->login($user);
+        $token = JWTAuth::fromUser($user);
 
-        return $this->respondWithToken($token, 201);
+        return response()->json($this->userResponse($user, $token), 201);
     }
 
-    /**
-     * POST /auth/logout
-     */
+    public function login(Request $request): JsonResponse
+    {
+        $credentials = $request->only('email', 'password');
+
+        if (!$token = auth('api')->attempt($credentials)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
+        }
+
+        $user = auth('api')->user();
+
+        return response()->json($this->userResponse($user, $token));
+    }
+
     public function logout(): JsonResponse
     {
         auth('api')->logout();
 
-        return response()->json(['message' => 'Successfully logged out']);
+        return response()->json(['message' => 'Logged out']);
     }
 
-    /**
-     * POST /auth/refresh
-     */
     public function refresh(): JsonResponse
     {
-        return $this->respondWithToken(auth('api')->refresh());
+        $token = auth('api')->refresh();
+        $user  = auth('api')->user();
+
+        return response()->json($this->userResponse($user, $token));
     }
 
-    /**
-     * GET /auth/me
-     */
     public function me(): JsonResponse
     {
-        return response()->json(auth('api')->user());
-    }
+        $user = auth('api')->user();
 
-    private function respondWithToken(string $token, int $status = 200): JsonResponse
-    {
-        return response()->json([
-            'user'         => auth('api')->user(),
-            'access_token' => $token,
-            'token_type'   => 'Bearer',
-            'expires_in'   => auth('api')->factory()->getTTL() * 60,
-        ], $status);
+        return response()->json(array_merge($user->toArray(), [
+            'userType' => $user->role,   // ✅ أضف userType هنا أيضاً
+        ]));
     }
 }

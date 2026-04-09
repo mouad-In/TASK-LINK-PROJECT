@@ -1,454 +1,419 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { 
-  MapPin, 
-  Clock, 
-  DollarSign, 
-  User, 
-  MessageSquare,
-  CheckCircle,
-  XCircle,
-  Edit,
-  Trash2,
-  Send,
-  MessageCircle
-  
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  ArrowLeft, MapPin, Calendar, Clock, Star,
+  MessageSquare, Heart, Share2, Flag, Shield,
+  ChevronRight, Send, Briefcase, Eye
 } from 'lucide-react';
-import { fetchTaskById, deleteTask, assignWorker } from '../features/tasks/tasksSlice';
-import { fetchApplicationsByTask, createApplication, updateApplicationStatus } from '../features/applications/applicationsSlice';
-import { fetchCommentsByTask, addComment } from '../features/comments/commentsSlice';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import { useForm } from 'react-hook-form';
-import { Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 
-const TaskDetail = () => {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
+import {
+  fetchTaskById,
+  clearCurrentTask,
+} from '@/features/tasks/tasksSlice'; // ← adjust path to your slice
 
-  const { currentTask, isLoading: taskLoading } = useSelector((state) => state.tasks);
-  const { applications, isLoading: appsLoading } = useSelector((state) => state.applications);
-  const { commentsByTask, isLoading: commentsLoading } = useSelector((state) => state.comments);
-  const { user } = useSelector((state) => state.auth);
+// ── Mock Proposals (until you have a proposalsSlice) ──────────────────────────
 
-  const [showApplyModal, setShowApplyModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [newComment, setNewComment] = useState('');
+const MOCK_PROPOSALS = [
+  { id: 1, name: 'Alex Thompson',  avatar: 'AT', rating: 4.9, reviews: 45,  price: 140, message: 'Hi! I have 5+ years of professional cleaning experience. Available this week!',         completedTasks: 89  },
+  { id: 2, name: 'Maria Garcia',   avatar: 'MG', rating: 4.7, reviews: 32,  price: 155, message: 'Professional cleaner with great attention to detail. Free re-clean if not happy!',     completedTasks: 67  },
+  { id: 3, name: 'David Kim',      avatar: 'DK', rating: 5.0, reviews: 18,  price: 130, message: 'New to the platform but 8 years in the industry. References available.',               completedTasks: 18  },
+  { id: 4, name: 'Priya Patel',    avatar: 'PP', rating: 4.8, reviews: 56,  price: 160, message: 'Top-rated cleaner with eco-friendly approach. Fully insured and background checked.',  completedTasks: 112 },
+];
 
-  const { register, handleSubmit, reset } = useForm();
+// Demo flag — swap with real auth selector when ready
+const DEMO_USER_TYPE = 'worker'; // 'client' | 'worker'
 
+// ── Component ──────────────────────────────────────────────────────────────────
+
+const TaskDetails = () => {
+  const { id }    = useParams();
+  const navigate  = useNavigate();
+  const dispatch  = useDispatch();
+
+  // ── Selectors — read directly from your tasksSlice shape ──
+  const task      = useSelector((state) => state.tasks.currentTask);
+  const isLoading = useSelector((state) => state.tasks.isLoading);
+  const error     = useSelector((state) => state.tasks.error);
+
+  // ── Local UI state ──
+  const [saved,           setSaved]           = useState(false);
+  const [showApplyForm,   setShowApplyForm]   = useState(false);
+  const [proposalPrice,   setProposalPrice]   = useState('');
+  const [proposalMessage, setProposalMessage] = useState('');
+
+  const isClient = DEMO_USER_TYPE === 'client';
+
+  // ── Fetch task on mount / id change ──
   useEffect(() => {
-    dispatch(fetchTaskById(id));
-    dispatch(fetchApplicationsByTask(id));
-    dispatch(fetchCommentsByTask(id));
-  }, [dispatch, id]);
+    if (id) dispatch(fetchTaskById(id));
 
-  const handleApply = (data) => {
-    dispatch(createApplication({
-      taskId: id,
-      workerId: user.id,
-      ...data
-    }));
-    setShowApplyModal(false);
-    reset();
-  };
+    // Clean up currentTask when leaving the page
+    return () => dispatch(clearCurrentTask());
+  }, [id, dispatch]);
 
-  const handleAcceptApplication = (applicationId) => {
-    dispatch(updateApplicationStatus({ applicationId, status: 'accepted' }));
-    const app = applications.find(a => a.id === applicationId);
-    if (app) {
-      dispatch(assignWorker({ taskId: id, workerId: app.workerId }));
-    }
-  };
-
-  const handleRejectApplication = (applicationId) => {
-    dispatch(updateApplicationStatus({ applicationId, status: 'rejected' }));
-  };
-
-  const handleAddComment = () => {
-    if (newComment.trim() && user) {
-      dispatch(addComment({ taskId: id, content: newComment.trim() }));
-      setNewComment('');
-    }
-  };
-
-  const getStatusBadgeVariant = (status) => {
-    switch (status) {
-      case 'completed': return 'success';
-      case 'in_progress': return 'primary';
-      case 'assigned': return 'secondary';
-      case 'published': return 'warning';
-      case 'accepted': return 'success';
-      case 'rejected': return 'error';
-      default: return 'default';
-    }
-  };
-
-  if (taskLoading || !currentTask) {
+  // ── Loading ──
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+        <p className="text-muted-foreground animate-pulse">Loading task…</p>
       </div>
     );
   }
 
-  const isClient = user?.role === 'client' && currentTask?.clientId === user?.id;
-  const isWorker = user?.role === 'worker';
-  const hasApplied = applications.some(app => app.workerId === user?.id);
-  const pendingApplications = applications.filter(app => app.status === 'pending');
-  const taskComments = commentsByTask[id] || [];
+  // ── Error ──
+  if (error) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <p className="text-destructive font-medium">Failed to load task</p>
+          <p className="text-sm text-muted-foreground">{error}</p>
+          <Button variant="outline" onClick={() => dispatch(fetchTaskById(id))}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Not found ──
+  if (!task) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center">
+        <p className="text-muted-foreground">Task not found.</p>
+      </div>
+    );
+  }
+
+  // ── Main render ──────────────────────────────────────────────────────────────
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-fuchsia-600 to-purple-600 rounded-3xl p-8 mb-8 shadow-2xl">
-            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <Badge variant={getStatusBadgeVariant(currentTask.status)} className="bg-white/20 backdrop-blur-sm">
-                    {currentTask.status.replace('_', ' ').toUpperCase()}
-                  </Badge>
-                  <Badge variant={currentTask.urgency === 'high' ? 'error' : currentTask.urgency === 'medium' ? 'warning' : 'success'} className="bg-white/20 backdrop-blur-sm">
-                    {currentTask.urgency.toUpperCase()} URGENCY
-                  </Badge>
-                </div>
-                <h1 className="text-4xl lg:text-5xl font-black text-white drop-shadow-lg mb-2">{currentTask.title}</h1>
-                <p className="text-white/90 text-lg drop-shadow-md">Posted {new Date(currentTask.createdAt).toLocaleDateString()}</p>
-              </div>
+    <div className="min-h-screen bg-muted/30">
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                {isClient && (
-                  <>
-                    <Link to={`/tasks/edit/${id}`} className="flex-1">
-                      <Button variant="outline" className="w-full bg-white/20 backdrop-blur-sm border-white/30 text-white hover:bg-white/30 transition-all">
-                        <Edit size={20} className="mr-2" />
-                        Edit Task
-                      </Button>
-                    </Link>
-                    <Button 
-                      variant="error"
-                      className="bg-red-500/90 hover:bg-red-500 text-white px-6"
-                      onClick={() => setShowDeleteModal(true)}
-                    >
-                      <Trash2 size={20} className="mr-2" />
-                      Delete
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 2xl:grid-cols-3 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Description</h2>
-                <p className="text-gray-600 whitespace-pre-wrap">{currentTask.description}</p>
-              </Card>
-
-              <Card>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Details</h2>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center">
-                    <DollarSign size={20} className="text-success mr-3" />
-                    <div>
-                      <p className="text-sm text-gray-500">Budget</p>
-                      <p className="font-semibold text-gray-800">${currentTask.budget}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock size={20} className="text-primary mr-3" />
-                    <div>
-                      <p className="text-sm text-gray-500">Category</p>
-                      <p className="font-semibold text-gray-800">{currentTask.category}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin size={20} className="text-secondary mr-3" />
-                    <div>
-                      <p className="text-sm text-gray-500">Location</p>
-                      <p className="font-semibold text-gray-800">{currentTask.location}</p>
-                    </div>
-                  </div>
-                  {currentTask.requiredSkills && (
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Required Skills</p>
-                      <div className="flex flex-wrap gap-2">
-                        {currentTask.requiredSkills.map((skill, idx) => (
-                          <Badge key={idx} variant="default">{skill}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-
-              {/* Applications */}
-              <Card>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-800">
-                    Applications ({applications.length})
-                  </h2>
-                </div>
-                {appsLoading ? (
-                  <p>Loading applications...</p>
-                ) : applications.length === 0 ? (
-                  <p className="text-gray-600 text-center py-8">No applications yet. Be the first to apply!</p>
-                ) : (
-                  <div className="space-y-4">
-                    {applications.map((app) => (
-                      <div key={app.id} className="p-6 bg-white border border-gray-200 rounded-xl hover:shadow-md transition-all">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
-                              W{app.workerId}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-gray-800">Worker #{app.workerId}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <div className="flex">
-                                  {[1,2,3,4,5].map((star) => (
-                                    <Star key={star} size={14} className="text-amber-400 fill-amber-400" />
-                                  ))}
-                                </div>
-                                <span className="text-sm text-gray-500">4.8 (127)</span>
-                              </div>
-                            </div>
-                          </div>
-                          <Badge variant={getStatusBadgeVariant(app.status)} size="lg">
-                            {app.status}
-                          </Badge>
-                        </div>
-                        
-                        <div className="mb-4">
-                          <p className="font-semibold text-lg text-gray-900">${app.price}</p>
-                          <p className="text-sm text-gray-500">{app.deliveryTime} delivery</p>
-                        </div>
-
-                        <p className="text-gray-700 italic mb-4 leading-relaxed">
-                          "{app.message}"
-                        </p>
-
-                        {isClient && app.status === 'pending' && (
-                          <div className="flex gap-2 pt-4 border-t">
-                            <Button 
-                              size="sm" 
-                              variant="success"
-                              onClick={() => handleAcceptApplication(app.id)}
-                              className="flex-1"
-                            >
-                              <CheckCircle size={16} className="mr-2" />
-                              Accept
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              className="flex-1"
-                              onClick={() => handleRejectApplication(app.id)}
-                            >
-                              <XCircle size={16} className="mr-2" />
-                              Reject
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              {/* Comments Section */}
-              <Card>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <MessageCircle size={20} />
-                    Comments ({commentsByTask[id]?.length || 0})
-                  </h2>
-                </div>
-                {commentsLoading ? (
-                  <p>Loading comments...</p>
-                ) : !commentsByTask[id] || commentsByTask[id].length === 0 ? (
-                  <p className="text-gray-600 text-center py-8">No comments yet. Be the first to comment!</p>
-                ) : (
-                  <div className="space-y-4 mb-6">
-                    {commentsByTask[id].map((comment) => (
-                      <div key={comment.id} className="p-4 bg-white border border-gray-200 rounded-xl">
-                        <div className="flex items-start gap-3 mb-2">
-                          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-                            {comment.authorName.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-gray-800">{comment.authorName}</p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(comment.createdAt).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-gray-700 ml-13">{comment.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                {user && (
-                  <div className="border-t pt-4">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add a comment..."
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                      rows="3"
-                    />
-                    <Button 
-                      className="mt-3 w-full"
-                      onClick={() => {
-                        if (newComment.trim()) {
-                          dispatch(addComment({ taskId: id, content: newComment.trim() }));
-                          setNewComment('');
-                        }
-                      }}
-                      disabled={!newComment.trim()}
-                    >
-                      Post Comment
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            </div>
-
-            {/* Sidebar */}
-            <div className="space-y-6">
-              <Card>
-                {isWorker && currentTask.status === 'published' && !hasApplied && (
-                  <Button 
-                    className="w-full" 
-                    onClick={() => setShowApplyModal(true)}
-                  >
-                    <Send size={18} className="mr-2" />
-                    Apply for Task
-                  </Button>
-                )}
-                {isWorker && hasApplied && (
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <CheckCircle size={24} className="mx-auto text-success mb-2" />
-                    <p className="text-gray-800 font-medium">Application Submitted</p>
-                    <p className="text-sm text-gray-600">Waiting for client response</p>
-                  </div>
-                )}
-                {currentTask.status !== 'published' && (
-                  <div className="text-center p-4 bg-gray-50 rounded-lg">
-                    <p className="text-gray-600">This task is no longer available</p>
-                  </div>
-                )}
-              </Card>
-
-              <Card title="Posted By">
-                <div className="flex items-center">
-                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                    <User size={24} className="text-primary" />
-                  </div>
-                  <div className="ml-3">
-                    <p className="font-medium text-gray-800">Client #{currentTask.clientId}</p>
-                    <Link 
-                      to={`/profile/${currentTask.clientId}`} 
-                      className="text-sm text-primary hover:underline"
-                    >
-                      View Profile
-                    </Link>
-                  </div>
-                </div>
-                
-                <Button variant="outline" className="w-full mt-4">
-                  <MessageSquare size={18} className="mr-2" />
-                  Message Client
-                </Button>
-              </Card>
-            </div>
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-md border-b border-border">
+        <div className="max-w-6xl mx-auto flex items-center gap-4 px-4 py-3">
+          <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-muted text-muted-foreground">
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h1 className="text-sm font-medium text-foreground truncate flex-1">Task Details</h1>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSaved(!saved)}
+              className={`p-2 rounded-xl hover:bg-muted ${saved ? 'text-red-500' : 'text-muted-foreground'}`}
+            >
+              <Heart className={`w-5 h-5 ${saved ? 'fill-current' : ''}`} />
+            </button>
+            <button className="p-2 rounded-xl hover:bg-muted text-muted-foreground">
+              <Share2 className="w-5 h-5" />
+            </button>
+            <button className="p-2 rounded-xl hover:bg-muted text-muted-foreground">
+              <Flag className="w-5 h-5" />
+            </button>
           </div>
         </div>
+      </header>
 
-        {/* Apply Modal */}
-        <Modal 
-          isOpen={showApplyModal} 
-          onClose={() => setShowApplyModal(false)}
-          title="Apply for Task"
-        >
-          <form onSubmit={handleSubmit(handleApply)}>
-            <Input
-              label="Your Price ($)"
-              type="number"
-              placeholder="Enter your price"
-              {...register('price', { required: true })}
-            />
-            <Input
-              label="Delivery Time"
-              placeholder="e.g., 2 days"
-              {...register('deliveryTime', { required: true })}
-            />
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Message to Client
-              </label>
-              <textarea
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                rows="4"
-                placeholder="Introduce yourself and explain why you're the best fit..."
-                {...register('message', { required: true })}
-              ></textarea>
-            </div>
-            <div className="flex gap-3">
-              <Button type="button" variant="outline" onClick={() => setShowApplyModal(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1">
-                Submit Application
-              </Button>
-            </div>
-          </form>
-        </Modal>
+      <main className="max-w-6xl mx-auto p-4 lg:p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Delete Confirmation Modal */}
-        <Modal 
-          isOpen={showDeleteModal} 
-          onClose={() => setShowDeleteModal(false)}
-          title="Delete Task"
-        >
-          <div className="space-y-4">
-            <div className="text-center">
-              <Trash2 size={48} className="mx-auto text-error mb-4" />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Delete "{currentTask.title}"?</h3>
-              <p className="text-gray-600">This action cannot be undone. The task and all associated applications will be permanently deleted.</p>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setShowDeleteModal(false)}>
-                Cancel
-              </Button>
-              <Button 
-                type="button" 
-                variant="error" 
-                className="flex-1"
-                onClick={() => {
-                  dispatch(deleteTask(id)).then(() => {
-                    setShowDeleteModal(false);
-                    navigate('/tasks');
-                  });
-                }}
-              >
-                Delete Task
-              </Button>
-            </div>
+          {/* ── Left column ── */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* Title & Meta */}
+            <Card className="border-border">
+              <CardContent className="p-6">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <Badge className="bg-primary/10 text-primary border-primary/20" variant="outline">
+                    {task.category}
+                  </Badge>
+                  <Badge
+                    className={task.status === 'Open'
+                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                      : 'bg-muted text-muted-foreground border-border'}
+                    variant="outline"
+                  >
+                    {task.status}
+                  </Badge>
+                  {task.urgency === 'Urgent' && (
+                    <Badge className="bg-destructive/10 text-destructive border-destructive/20" variant="outline">
+                      🔥 Urgent
+                    </Badge>
+                  )}
+                </div>
+
+                <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-4">{task.title}</h1>
+
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  {task.location  && <span className="flex items-center gap-1.5"><MapPin   className="w-4 h-4" />{task.location}</span>}
+                  {task.deadline  && <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4" />Due {task.deadline}</span>}
+                  {task.postedAt  && <span className="flex items-center gap-1.5"><Clock    className="w-4 h-4" />Posted {task.postedAt}</span>}
+                  {task.views     && <span className="flex items-center gap-1.5"><Eye      className="w-4 h-4" />{task.views} views</span>}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Description */}
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground text-lg">Description</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="prose prose-sm max-w-none text-foreground/80 whitespace-pre-line leading-relaxed">
+                  {task.fullDescription || task.description}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Skills */}
+            {task.skills?.length > 0 && (
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground text-lg">Required Skills</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {task.skills.map((skill) => (
+                      <Badge key={skill} variant="secondary" className="px-3 py-1.5 text-sm">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Location */}
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground text-lg">Location</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-xl bg-muted h-48 flex items-center justify-center mb-4 border border-border">
+                  <div className="text-center text-muted-foreground">
+                    <MapPin className="w-8 h-8 mx-auto mb-2" />
+                    <p className="font-medium">{task.location}</p>
+                    {task.address && <p className="text-sm">{task.address}</p>}
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">Exact address will be shared after hiring.</p>
+              </CardContent>
+            </Card>
+
+            {/* Proposals */}
+            <Card className="border-border">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-foreground text-lg">
+                    Proposals ({task.applicationsCount ?? MOCK_PROPOSALS.length})
+                  </CardTitle>
+                  {isClient && (
+                    <span className="text-sm text-muted-foreground">
+                      {MOCK_PROPOSALS.length} workers interested
+                    </span>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isClient ? (
+                  MOCK_PROPOSALS.map((proposal) => (
+                    <div key={proposal.id} className="p-4 rounded-xl border border-border hover:border-primary/30 transition-all bg-card">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
+                          {proposal.avatar}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <h3 className="font-semibold text-foreground">{proposal.name}</h3>
+                            <span className="text-lg font-bold text-foreground">${proposal.price}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
+                            <span className="flex items-center gap-1">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              {proposal.rating}
+                            </span>
+                            <span>{proposal.reviews} reviews</span>
+                            <span>{proposal.completedTasks} tasks done</span>
+                          </div>
+                          <p className="text-sm text-foreground/70 mb-3">{proposal.message}</p>
+                          <div className="flex items-center gap-2">
+                            <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-primary-foreground">
+                              Hire Now
+                            </Button>
+                            <Button size="sm" variant="outline">
+                              <MessageSquare className="w-4 h-4 mr-1" /> Chat
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium text-foreground">Proposals are only visible to the task poster</p>
+                    <p className="text-sm mt-1">Submit your proposal using the form on the right</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </Modal>
-      </div>
-    </>
+
+          {/* ── Right column — Sidebar ── */}
+          <div className="space-y-6">
+
+            {/* Budget & Action */}
+            <Card className="border-border sticky top-20">
+              <CardContent className="p-6">
+                <div className="text-center mb-6">
+                  <p className="text-sm text-muted-foreground mb-1">{task.budgetType ?? 'Fixed Price'}</p>
+                  <p className="text-4xl font-bold text-foreground">${task.budget}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {task.applicationsCount ?? task.proposals ?? 0} proposals so far
+                  </p>
+                </div>
+
+                {isClient ? (
+                  <div className="space-y-3">
+                    <Button className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground" size="lg">
+                      Edit Task
+                    </Button>
+                    <Button variant="outline" className="w-full" size="lg">
+                      Close Task
+                    </Button>
+                  </div>
+                ) : showApplyForm ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-1.5 block">Your Price ($)</label>
+                      <Input
+                        type="number"
+                        placeholder="Enter your price"
+                        value={proposalPrice}
+                        onChange={(e) => setProposalPrice(e.target.value)}
+                        className="bg-muted border-border"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-1.5 block">Cover Letter</label>
+                      <Textarea
+                        placeholder="Why are you the best fit for this task?"
+                        rows={4}
+                        value={proposalMessage}
+                        onChange={(e) => setProposalMessage(e.target.value)}
+                        className="bg-muted border-border resize-none"
+                      />
+                    </div>
+                    <Button
+                      className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                      size="lg"
+                      disabled={!proposalPrice || !proposalMessage}
+                    >
+                      <Send className="w-4 h-4 mr-2" /> Submit Proposal
+                    </Button>
+                    <Button variant="ghost" className="w-full" onClick={() => setShowApplyForm(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <Button
+                      className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                      size="lg"
+                      onClick={() => setShowApplyForm(true)}
+                    >
+                      Apply Now
+                    </Button>
+                    <Button variant="outline" className="w-full" size="lg" onClick={() => setSaved(!saved)}>
+                      <Heart className={`w-4 h-4 mr-2 ${saved ? 'fill-red-500 text-red-500' : ''}`} />
+                      {saved ? 'Saved' : 'Save Task'}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Client Info */}
+            {task.client && (
+              <Card className="border-border">
+                <CardHeader>
+                  <CardTitle className="text-foreground text-lg">About the Client</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-lg font-bold text-primary-foreground">
+                      {task.client.avatar}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-foreground">{task.client.name}</h3>
+                        {task.client.verified && <Shield className="w-4 h-4 text-primary" />}
+                      </div>
+                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        {task.client.rating} ({task.client.reviews} reviews)
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="mb-4" />
+
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Member since</span>
+                      <span className="text-foreground font-medium">{task.client.joined}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tasks posted</span>
+                      <span className="text-foreground font-medium">{task.client.tasks}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Hire rate</span>
+                      <span className="text-foreground font-medium">92%</span>
+                    </div>
+                  </div>
+
+                  <Button variant="outline" className="w-full mt-4">
+                    <MessageSquare className="w-4 h-4 mr-2" /> Contact Client
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Similar Tasks */}
+            <Card className="border-border">
+              <CardHeader>
+                <CardTitle className="text-foreground text-lg">Similar Tasks</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {['Kitchen Deep Clean', 'Office Cleaning Weekly', 'Move-out Cleaning'].map((title, i) => (
+                  <button
+                    key={i}
+                    className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-muted transition-colors text-left"
+                    onClick={() => navigate(`/tasks/${i + 3}`)}
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        ${[80, 120, 200][i]} • {['Manhattan', 'Queens', 'Bronx'][i]}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };
 
-export default TaskDetail;
+export default TaskDetails;

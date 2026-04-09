@@ -1,26 +1,56 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 const initialState = {
+  unreadCount: 0,
+  notifications: [],
   toasts: [],
+  isLoading: false,
 };
+
+export const fetchUnreadCount = createAsyncThunk(
+  'notifications/fetchUnreadCount',
+  async (_, thunkAPI) => {
+    const response = { unreadCount: 3 };
+    return response.unreadCount;
+  }
+);
+
+export const markNotificationsAsRead = createAsyncThunk(
+  'notifications/markNotificationsAsRead',
+  async (_, thunkAPI) => {
+    return true;
+  }
+);
 
 const notificationsSlice = createSlice({
   name: 'notifications',
   initialState,
   reducers: {
+    setUnreadCount: (state, action) => {
+      state.unreadCount = action.payload;
+    },
     addToast: (state, action) => {
-      const { id = Date.now(), message, type = 'info', duration = 5000 } = action.payload;
-      state.toasts.unshift({ id, message, type, duration, createdAt: Date.now() });
+      state.toasts.push({
+        id: Date.now(),
+        title: action.payload.title || '',
+        description: action.payload.description || '',
+        variant: action.payload.variant || 'default',
+      });
     },
     removeToast: (state, action) => {
-      state.toasts = state.toasts.filter(toast => toast.id !== action.payload);
+      state.toasts = state.toasts.filter(t => t.id !== action.payload);
     },
-    clearToasts: (state) => {
-      state.toasts = [];
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchUnreadCount.fulfilled, (state, action) => {
+        state.unreadCount = action.payload;
+      })
+      .addCase(markNotificationsAsRead.fulfilled, (state) => {
+        state.unreadCount = 0;
+      });
   },
 });
 
-export const { addToast, removeToast, clearToasts } = notificationsSlice.actions;
+export const { setUnreadCount, addToast, removeToast } = notificationsSlice.actions;
 export default notificationsSlice.reducer;
-

@@ -176,3 +176,20 @@ export const reviewService = {
   },
 };
 
+// أضف هذا في نهاية ملف apiService.js
+export const favoritesService = {
+  async getFavorites(clientId) {
+    const response = await api.get(`/favorites/${clientId}`);
+    return response.data;
+  },
+
+  async addFavorite(clientId, workerId) {
+    const response = await api.post('/favorites', { client_id: clientId, worker_id: workerId });
+    return response.data;
+  },
+
+  async removeFavorite(clientId, workerId) {
+    await api.delete(`/favorites/${clientId}/${workerId}`);
+    return true;
+  },
+};

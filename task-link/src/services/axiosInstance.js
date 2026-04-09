@@ -13,9 +13,9 @@ api.interceptors.request.use(
   (config) => {
     const user = JSON.parse(localStorage.getItem('user'));
 
-    // ✅ Laravel يرجع access_token مش token
-    if (user?.access_token) {
-      config.headers.Authorization = `Bearer ${user.access_token}`;
+    // ✅ بدّل access_token إلى token
+    if (user?.token) {
+      config.headers.Authorization = `Bearer ${user.token}`;
     }
 
     return config;

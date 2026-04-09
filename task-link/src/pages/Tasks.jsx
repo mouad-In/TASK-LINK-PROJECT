@@ -1,340 +1,1191 @@
-import React, { useEffect, useState } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { Link } from 'react-router-dom';
-import { 
-  Search, 
-  Plus, 
-  Filter, 
-  MapPin, 
-  Clock, 
-  DollarSign,
-  Users,
-  Edit2 as Edit,
-  Trash2,
-  TrendingUp
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Link } from "react-router-dom";
+import {
+  Search,
+  Filter,
+  MapPin,
+  Star,
+  Clock,
+  ChevronDown,
+  LayoutGrid,
+  List,
+  Heart,
+  Briefcase,
+  SlidersHorizontal,
+  ArrowUpDown,
+  Loader
 } from 'lucide-react';
-import { fetchTasks, setFilters, deleteTask } from '../features/tasks/tasksSlice';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Badge from '../components/ui/Badge';
-import Modal from '../components/ui/Modal';
-const categories = [
-  'Plumbing',
-  'Electrical',
-  'Carpentry',
-  'Painting',
-  'Cleaning',
-  'Moving Help',
-  'Gardening',
-  'Assembly',
-  'Other',
+import {
+  fetchTasks,
+  setFilters,
+  clearFilters,
+  assignWorker
+} from '../features/tasks/tasksSlice';
+import { addToast } from '../features/notifications/notificationsSlice';
+
+const categories = ['All', 'Cleaning', 'Repairs', 'Moving', 'IT Help', 'Gardening', 'Photography'];
+
+const categoryConfig = {
+  Cleaning:    { color: '#0ea5e9', bg: '#e0f2fe' },
+  Repairs:     { color: '#f97316', bg: '#ffedd5' },
+  Moving:      { color: '#6366f1', bg: '#e0e7ff' },
+  'IT Help':   { color: '#8b5cf6', bg: '#ede9fe' },
+  Gardening:   { color: '#22c55e', bg: '#dcfce7' },
+  Photography: { color: '#ec4899', bg: '#fce7f3' },
+};
+
+const avatarColors = [
+  '#0ea5e9', '#6366f1', '#f97316', '#22c55e', '#ec4899', '#8b5cf6'
 ];
 
-const urgencyLevels = [
-  { value: 'low', label: 'Low', color: 'green' },
-  { value: 'medium', label: 'Medium', color: 'yellow' },
-  { value: 'high', label: 'High', color: 'red' },
-];
-
-
-const popularTags = [
-  'logo design',
-  'data entry',
-  'video editing',
-  'website development',
-  'social media manager',
-  'youtube thumbnail',
-  'cleaning',
-  'home repair',
+const sortOptions = [
+  { value: 'newest', label: 'Newest First' },
+  { value: 'oldest', label: 'Oldest First' },
+  { value: 'budget_high', label: 'Budget: High to Low' },
+  { value: 'budget_low', label: 'Budget: Low to High' },
+  { value: 'distance', label: 'Distance: Nearest First' },
 ];
 
 const Tasks = () => {
   const dispatch = useDispatch();
-  const { filteredTasks, filters, isLoading } = useSelector((state) => state.tasks);
-  const { user } = useSelector((state) => state.auth);
+  const { tasks, filteredTasks, isLoading, error, filters, pagination } = useSelector((state) => state.tasks);
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  
+  const [viewMode, setViewMode] = useState(() => {
+    return localStorage.getItem('taskViewMode') || 'grid';
+  });
+  const [favorites, setFavorites] = useState(() => {
+    const saved = localStorage.getItem('favoriteTasks');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [localSearch, setLocalSearch] = useState(filters.search || '');
+  const [selectedCategory, setSelectedCategory] = useState(filters.category || 'All');
+  const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState(null);
-  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [minBudget, setMinBudget] = useState(filters.minBudget || '');
+  const [maxBudget, setMaxBudget] = useState(filters.maxBudget || '');
+  const [urgency, setUrgency] = useState(filters.urgency || '');
+  const [applyingFor, setApplyingFor] = useState(null);
 
+  // Load tasks on mount
   useEffect(() => {
-    dispatch(fetchTasks());
-  }, [dispatch]);
+    dispatch(fetchTasks({
+      page: pagination.currentPage,
+      category: filters.category,
+      search: filters.search,
+    }));
+  }, [dispatch, pagination.currentPage, filters.category, filters.search]);
 
-  const handleFilterChange = (key, value) => {
-    dispatch(setFilters({ [key]: value }));
+  // Save view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('taskViewMode', viewMode);
+  }, [viewMode]);
+
+  // Save favorites to localStorage
+  useEffect(() => {
+    localStorage.setItem('favoriteTasks', JSON.stringify(favorites));
+  }, [favorites]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== filters.search) {
+        dispatch(setFilters({ search: localSearch }));
+        dispatch(fetchTasks({ search: localSearch, page: 1 }));
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [localSearch, dispatch, filters.search]);
+
+  const toggleFavorite = (taskId) => {
+    setFavorites(prev => 
+      prev.includes(taskId) 
+        ? prev.filter(id => id !== taskId) 
+        : [...prev, taskId]
+    );
+    dispatch(addToast({
+      message: favorites.includes(taskId) ? 'Removed from favorites' : 'Added to favorites',
+      type: 'info'
+    }));
   };
 
-  const getStatusBadgeVariant = (status) => {
-    switch (status) {
-      case 'completed': return 'success';
-      case 'in_progress': return 'primary';
-      case 'assigned': return 'secondary';
-      case 'published': return 'warning';
-      default: return 'default';
+  const handleCategoryChange = (category) => {
+    const newCategory = category === 'All' ? '' : category;
+    setSelectedCategory(category);
+    dispatch(setFilters({ category: newCategory }));
+    dispatch(fetchTasks({ category: newCategory, page: 1 }));
+  };
+
+  const handleApplyFilters = () => {
+    const filterParams = {
+      minBudget: minBudget || '',
+      maxBudget: maxBudget || '',
+      urgency: urgency || '',
+    };
+    dispatch(setFilters(filterParams));
+    dispatch(fetchTasks({ ...filterParams, page: 1 }));
+    setShowFilters(false);
+    dispatch(addToast({ message: 'Filters applied', type: 'success' }));
+  };
+
+  const handleClearFilters = () => {
+    setMinBudget('');
+    setMaxBudget('');
+    setUrgency('');
+    setSelectedCategory('All');
+    setLocalSearch('');
+    dispatch(clearFilters());
+    dispatch(fetchTasks({ page: 1 }));
+    dispatch(addToast({ message: 'Filters cleared', type: 'info' }));
+  };
+
+  const handleApply = async (taskId) => {
+    if (!isAuthenticated) {
+      dispatch(addToast({ message: 'Please login to apply for tasks', type: 'error' }));
+      return;
+    }
+    
+    setApplyingFor(taskId);
+    try {
+      await dispatch(assignWorker({ taskId, workerId: user?.id })).unwrap();
+      dispatch(addToast({ message: 'Application submitted successfully!', type: 'success' }));
+    } catch (error) {
+      dispatch(addToast({ message: error || 'Failed to apply for task', type: 'error' }));
+    } finally {
+      setApplyingFor(null);
     }
   };
 
-  const getUrgencyBadgeVariant = (urgency) => {
-    switch (urgency) {
-      case 'high': return 'error';
-      case 'medium': return 'warning';
-      case 'low': return 'success';
-      default: return 'default';
+  const getSortedTasks = () => {
+    const tasksToSort = filteredTasks.length > 0 ? filteredTasks : tasks;
+    
+    switch(sortBy) {
+      case 'newest':
+        return [...tasksToSort].sort((a, b) => new Date(b.postedAt) - new Date(a.postedAt));
+      case 'oldest':
+        return [...tasksToSort].sort((a, b) => new Date(a.postedAt) - new Date(b.postedAt));
+      case 'budget_high':
+        return [...tasksToSort].sort((a, b) => b.budget - a.budget);
+      case 'budget_low':
+        return [...tasksToSort].sort((a, b) => a.budget - b.budget);
+      case 'distance':
+        return [...tasksToSort].sort((a, b) => parseFloat(a.distance) - parseFloat(b.distance));
+      default:
+        return tasksToSort;
     }
   };
 
-  // Filter tasks based on user role
-  const displayedTasks = user?.role === 'client' 
-    ? filteredTasks.filter(t => t.clientId === user.id)
-    : user?.role === 'worker'
-    ? filteredTasks.filter(t => t.status === 'published' || t.workerId === user.id)
-    : filteredTasks;
+  const displayTasks = getSortedTasks();
+
+  if (isLoading && tasks.length === 0) {
+    return (
+      <div style={styles.loadingContainer}>
+        <Loader className="animate-spin" style={styles.spinner} />
+        <p style={styles.loadingText}>Loading tasks...</p>
+      </div>
+    );
+  }
+
+  if (error && tasks.length === 0) {
+    return (
+      <div style={styles.errorContainer}>
+        <p style={styles.errorText}>{error}</p>
+        <button onClick={() => dispatch(fetchTasks())} style={styles.retryButton}>
+          Try Again
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">
-          {user?.role === 'client' ? 'My Tasks' : 'Browse Tasks'}
-        </h1>
-        {user?.role === 'client' && (
-          <Link to="/tasks/create">
-            <Button>
-              <Plus size={18} className="mr-2" />
-              Create Task
-            </Button>
+    <div style={styles.container}>
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
+
+      {/* Top Navigation */}
+      <header style={styles.header}>
+        <div style={styles.headerContent}>
+          {/* Logo */}
+          <Link to="/" style={styles.logo}>
+            <div style={styles.logoIcon}>
+              <Briefcase style={styles.logoIconSvg} />
+            </div>
+            <span style={styles.logoText}>TaskBoard</span>
           </Link>
-        )}
-      </div>
 
-      {/* Search and Filters */}
-      <Card>
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search with Popular Tags Dropdown */}
-          <div className="flex-1 relative">
-            <Search size={18} className="absolute left-3 top-3 text-gray-400 z-10" />
+          {/* Search */}
+          <div style={styles.searchContainer}>
+            <Search style={styles.searchIcon} />
             <input
-              type="text"
-              placeholder="What service are you looking for today?"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              onFocus={() => setShowSearchDropdown(true)}
-              onBlur={() => setTimeout(() => setShowSearchDropdown(false), 150)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              style={styles.searchInput}
+              placeholder="Search tasks by title or location..."
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
             />
+          </div>
 
-            {/* Popular Tags Dropdown */}
-            {showSearchDropdown && filters.search === '' && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-4 z-50">
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp size={14} className="text-gray-400" />
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Popular right now
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {popularTags.map((tag) => (
-                    <button
-                      key={tag}
-                      onMouseDown={() => {
-                        handleFilterChange('search', tag);
-                        setShowSearchDropdown(false);
-                      }}
-                      className="px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded-full hover:bg-gray-50 transition-colors cursor-pointer"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
+          {/* Actions */}
+          <div style={styles.headerActions}>
+            <button 
+              style={styles.filterButton}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal style={styles.filterButtonIcon} />
+              Filters
+            </button>
+            <Link to="/client/tasks/new" style={styles.postButton}>
+              Post a task
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div style={styles.filterPanel}>
+          <div style={styles.filterPanelContent}>
+            <h3 style={styles.filterTitle}>Filter Tasks</h3>
+            <div style={styles.filterGrid}>
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>Min Budget ($)</label>
+                <input
+                  type="number"
+                  style={styles.filterInput}
+                  value={minBudget}
+                  onChange={(e) => setMinBudget(e.target.value)}
+                  placeholder="Min"
+                />
               </div>
-            )}
-          </div>
-
-          {/* Filter Toggle */}
-          <Button 
-            variant="outline" 
-            onClick={() => setShowFilters(!showFilters)}
-          >
-            <Filter size={18} className="mr-2" />
-            Filters
-          </Button>
-        </div>
-
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select
-                value={filters.category}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">All Categories</option>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>Max Budget ($)</label>
+                <input
+                  type="number"
+                  style={styles.filterInput}
+                  value={maxBudget}
+                  onChange={(e) => setMaxBudget(e.target.value)}
+                  placeholder="Max"
+                />
+              </div>
+              <div style={styles.filterGroup}>
+                <label style={styles.filterLabel}>Urgency</label>
+                <select
+                  style={styles.filterSelect}
+                  value={urgency}
+                  onChange={(e) => setUrgency(e.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="normal">Normal</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Min Budget</label>
-              <input
-                type="number"
-                value={filters.minBudget}
-                onChange={(e) => handleFilterChange('minBudget', e.target.value)}
-                placeholder="Min $"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Budget</label>
-              <input
-                type="number"
-                value={filters.maxBudget}
-                onChange={(e) => handleFilterChange('maxBudget', e.target.value)}
-                placeholder="Max $"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Urgency</label>
-              <select
-                value={filters.urgency}
-                onChange={(e) => handleFilterChange('urgency', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">All</option>
-                {urgencyLevels.map(level => (
-                  <option key={level.value} value={level.value}>{level.label}</option>
-                ))}
-              </select>
+            <div style={styles.filterActions}>
+              <button onClick={handleClearFilters} style={styles.clearFilterButton}>
+                Clear All
+              </button>
+              <button onClick={handleApplyFilters} style={styles.applyFilterButton}>
+                Apply Filters
+              </button>
             </div>
           </div>
-        )}
-      </Card>
-
-      {/* Tasks List */}
-      {isLoading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading tasks...</p>
-        </div>
-      ) : displayedTasks.length === 0 ? (
-        <Card>
-          <div className="text-center py-8">
-            <Users size={48} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-800 mb-2">No tasks found</h3>
-            <p className="text-gray-600">Try adjusting your filters or create a new task.</p>
-          </div>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {displayedTasks.map((task) => (
-            <div key={task.id} className="group">
-              <Link to={`/tasks/${task.id}`} className="block">
-                <Card hover className="h-full group-hover:shadow-lg transition-all">
-                  <div className="flex items-start justify-between mb-3">
-                    <Badge variant={getStatusBadgeVariant(task.status)}>
-                      {task.status.replace('_', ' ')}
-                    </Badge>
-                    <Badge variant={getUrgencyBadgeVariant(task.urgency)}>
-                      {task.urgency}
-                    </Badge>
-                  </div>
-                  
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">{task.title}</h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{task.description}</p>
-                  
-                  <div className="space-y-2 text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <DollarSign size={16} className="mr-2 text-success" />
-                      <span className="font-medium text-gray-800">${task.budget}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <MapPin size={16} className="mr-2" />
-                      <span>{task.location}</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Clock size={16} className="mr-2" />
-                      <span>{new Date(task.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-gray-200">
-                    <Badge variant="default">{task.category}</Badge>
-                    {task.applicationsCount > 0 && (
-                      <Badge variant="secondary" className="ml-2">
-                        {task.applicationsCount} applications
-                      </Badge>
-                    )}
-                  </div>
-                </Card>
-              </Link>
-              {user?.role === 'client' && task.clientId === user.id && (
-                <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-all">
-                  <Link to={`/tasks/edit/${task.id}`} className="flex-1">
-                    <Button size="sm" variant="outline" className="w-full">
-                      <Edit size={16} className="mr-1" />
-                      Edit
-                    </Button>
-                  </Link>
-                  <Button 
-                    size="sm" 
-                    variant="error" 
-                    className="w-24"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowDeleteModal(true);
-                      setTaskToDelete(task.id);
-                    }}
-                  >
-                    <Trash2 size={16} className="mr-1" />
-                    Delete
-                  </Button>
-                </div>
-              )}
-            </div>
-          ))}
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      <Modal 
-        isOpen={showDeleteModal} 
-        onClose={() => setShowDeleteModal(false)}
-        title="Delete Task"
-      >
-        <div className="space-y-4">
-          <div className="text-center">
-            <Trash2 size={48} className="mx-auto text-error mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">Delete Task?</h3>
-            <p className="text-gray-600">This action cannot be undone. The task and all associated applications will be permanently deleted.</p>
+      <main style={styles.main}>
+        {/* Toolbar */}
+        <div style={styles.toolbar}>
+          {/* Categories */}
+          <div style={styles.categoriesContainer}>
+            {categories.map(cat => (
+              <button
+                key={cat}
+                style={{
+                  ...styles.categoryButton,
+                  ...(selectedCategory === cat ? styles.categoryButtonActive : {})
+                }}
+                onClick={() => handleCategoryChange(cat)}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
-          <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => setShowDeleteModal(false)}>
-              Cancel
-            </Button>
-            <Button 
-              type="button" 
-              variant="error" 
-              className="flex-1"
-              onClick={() => {
-                if (taskToDelete) {
-                  dispatch(deleteTask(taskToDelete)).then(() => {
-                    setShowDeleteModal(false);
-                  });
-                }
-              }}
-            >
-              Delete Task
-            </Button>
+
+          {/* Right controls */}
+          <div style={styles.rightControls}>
+            <div style={styles.sortContainer}>
+              <select
+                style={styles.sortSelect}
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                {sortOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={styles.viewToggle}>
+              <button
+                style={{
+                  ...styles.viewButton,
+                  ...(viewMode === 'grid' ? styles.viewButtonActive : {})
+                }}
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid style={styles.viewButtonIcon} />
+              </button>
+              <button
+                style={{
+                  ...styles.viewButton,
+                  ...(viewMode === 'list' ? styles.viewButtonActive : {})
+                }}
+                onClick={() => setViewMode('list')}
+              >
+                <List style={styles.viewButtonIcon} />
+              </button>
+            </div>
           </div>
         </div>
-      </Modal>
+
+        {/* Count */}
+        <p style={styles.countText}>
+          <strong style={styles.countStrong}>{displayTasks.length}</strong> tasks available
+          {isLoading && <span style={styles.loadingBadge}> (loading...)</span>}
+        </p>
+
+        {/* Loading Overlay for pagination */}
+        {isLoading && tasks.length > 0 && (
+          <div style={styles.loadingOverlay}>
+            <Loader className="animate-spin" style={styles.loadingOverlayIcon} />
+          </div>
+        )}
+
+        {/* Grid View */}
+        {viewMode === 'grid' && (
+          <div style={styles.gridContainer}>
+            {displayTasks.map((task, i) => {
+              const cfg = categoryConfig[task.category] || { color: '#6b7280', bg: '#f3f4f6' };
+              const isFav = favorites.includes(task.id);
+              const isApplying = applyingFor === task.id;
+              
+              return (
+                <div key={task.id} style={styles.gridCard}>
+                  {/* Top row */}
+                  <div style={styles.cardHeader}>
+                    <div style={styles.cardTags}>
+                      <span style={{ ...styles.categoryPill, color: cfg.color, background: cfg.bg }}>
+                        {task.category}
+                      </span>
+                      {task.urgency === 'urgent' && (
+                        <span style={styles.urgentPill}>
+                          <span style={styles.urgentDot} />
+                          Urgent
+                        </span>
+                      )}
+                    </div>
+                    <button 
+                      style={{ ...styles.favButton, color: isFav ? '#ef4444' : '#d1d5db' }}
+                      onClick={() => toggleFavorite(task.id)}
+                    >
+                      <Heart style={{ width: 17, height: 17, fill: isFav ? '#ef4444' : 'none' }} />
+                    </button>
+                  </div>
+
+                  {/* Title */}
+                  <h3 style={styles.cardTitle}>{task.title}</h3>
+
+                  {/* Description */}
+                  <p style={styles.cardDescription}>{task.fullDescription || task.description}</p>
+
+                  {/* Meta */}
+                  <div style={styles.cardMeta}>
+                    <span style={styles.metaTag}>
+                      <MapPin style={styles.metaIcon} />
+                      {task.location}
+                    </span>
+                    <div style={styles.divider} />
+                    <span style={styles.metaTag}>
+                      <Clock style={styles.metaIcon} />
+                      {task.postedAt}
+                    </span>
+                  </div>
+
+                  {/* Footer */}
+                  <div style={styles.cardFooter}>
+                    <div style={styles.userInfo}>
+                      <div style={{ ...styles.avatar, background: avatarColors[i % avatarColors.length] }}>
+                        {task.client?.initials || 'JD'}
+                      </div>
+                      <div>
+                        <p style={styles.userName}>{task.client?.name || 'Client'}</p>
+                        <div style={styles.stars}>
+                          <Star style={styles.starIcon} />
+                          <span style={styles.rating}>{task.client?.rating || 4.5} <span style={styles.reviewCount}>({task.client?.reviews || 0})</span></span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.budgetInfo}>
+                      <p style={styles.budgetText}>${task.budget}</p>
+                      <p style={styles.distanceText}>{task.distance || 'Near you'}</p>
+                    </div>
+                  </div>
+
+                  <button
+                    style={styles.applyButton}
+                    onClick={() => handleApply(task.id)}
+                    disabled={isApplying}
+                  >
+                    {isApplying ? 'Applying...' : 'Apply Now'}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* List View */}
+        {viewMode === 'list' && (
+          <div style={styles.listContainer}>
+            {displayTasks.map((task, i) => {
+              const cfg = categoryConfig[task.category] || { color: '#6b7280', bg: '#f3f4f6' };
+              const isFav = favorites.includes(task.id);
+              const isApplying = applyingFor === task.id;
+              
+              return (
+                <div key={task.id} style={styles.listCard}>
+                  {/* Avatar */}
+                  <div style={{ ...styles.listAvatar, background: avatarColors[i % avatarColors.length] }}>
+                    {task.client?.initials || 'JD'}
+                  </div>
+
+                  {/* Main content */}
+                  <div style={styles.listContent}>
+                    <div style={styles.listHeader}>
+                      <div style={styles.listInfo}>
+                        <div style={styles.listTags}>
+                          <span style={{ ...styles.categoryPill, color: cfg.color, background: cfg.bg }}>
+                            {task.category}
+                          </span>
+                          {task.urgency === 'urgent' && (
+                            <span style={styles.urgentPill}>
+                              <span style={styles.urgentDot} />
+                              Urgent
+                            </span>
+                          )}
+                        </div>
+                        <h3 style={styles.listTitle}>{task.title}</h3>
+                        <p style={styles.listDescription}>{task.fullDescription || task.description}</p>
+                        <div style={styles.listMeta}>
+                          <span style={styles.metaTag}>
+                            <MapPin style={styles.metaIcon} />
+                            {task.location} · {task.distance || 'Near you'}
+                          </span>
+                          <div style={styles.divider} />
+                          <span style={styles.metaTag}>
+                            <Clock style={styles.metaIcon} />
+                            {task.postedAt}
+                          </span>
+                          <div style={styles.divider} />
+                          <div style={styles.stars}>
+                            <Star style={styles.starIcon} />
+                            <span style={styles.rating}>{task.client?.rating || 4.5} ({task.client?.reviews || 0})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right side */}
+                      <div style={styles.listActions}>
+                        <button 
+                          style={{ ...styles.favButton, color: isFav ? '#ef4444' : '#d1d5db' }}
+                          onClick={() => toggleFavorite(task.id)}
+                        >
+                          <Heart style={{ width: 16, height: 16, fill: isFav ? '#ef4444' : 'none' }} />
+                        </button>
+                        <p style={styles.listBudget}>${task.budget}</p>
+                        <button
+                          style={styles.listApplyButton}
+                          onClick={() => handleApply(task.id)}
+                          disabled={isApplying}
+                        >
+                          {isApplying ? 'Applying...' : 'Apply'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.lastPage > 1 && (
+          <div style={styles.pagination}>
+            <button
+              style={{
+                ...styles.paginationButton,
+                ...(pagination.currentPage === 1 && styles.paginationButtonDisabled)
+              }}
+              onClick={() => dispatch(fetchTasks({ page: pagination.currentPage - 1 }))}
+              disabled={pagination.currentPage === 1}
+            >
+              Previous
+            </button>
+            <span style={styles.paginationInfo}>
+              Page {pagination.currentPage} of {pagination.lastPage}
+            </span>
+            <button
+              style={{
+                ...styles.paginationButton,
+                ...(pagination.currentPage === pagination.lastPage && styles.paginationButtonDisabled)
+              }}
+              onClick={() => dispatch(fetchTasks({ page: pagination.currentPage + 1 }))}
+              disabled={pagination.currentPage === pagination.lastPage}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </main>
     </div>
   );
+};
+
+// Styles object
+const styles = {
+  container: {
+    fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif",
+    minHeight: '100vh',
+    backgroundColor: '#f8f9fb',
+    color: '#111827',
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#f8f9fb',
+  },
+  spinner: {
+    width: 48,
+    height: 48,
+    color: '#6366f1',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#6b7280',
+    fontSize: 14,
+  },
+  errorContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#f8f9fb',
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  retryButton: {
+    padding: '8px 16px',
+    backgroundColor: '#6366f1',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    cursor: 'pointer',
+  },
+  header: {
+    background: '#fff',
+    borderBottom: '1px solid #e5e7eb',
+    position: 'sticky',
+    top: 0,
+    zIndex: 30,
+  },
+  headerContent: {
+    maxWidth: 1200,
+    margin: '0 auto',
+    padding: '0 24px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 64,
+  },
+  logo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    textDecoration: 'none',
+  },
+  logoIcon: {
+    width: 32,
+    height: 32,
+    background: '#111827',
+    borderRadius: 8,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoIconSvg: {
+    width: 16,
+    height: 16,
+    color: '#fff',
+  },
+  logoText: {
+    fontSize: 17,
+    fontWeight: 700,
+    color: '#111827',
+    letterSpacing: '-0.02em',
+  },
+  searchContainer: {
+    flex: 1,
+    maxWidth: 480,
+    margin: '0 32px',
+    position: 'relative',
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: 14,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: 16,
+    height: 16,
+    color: '#9ca3af',
+  },
+  searchInput: {
+    width: '100%',
+    height: 44,
+    padding: '0 16px 0 44px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    fontSize: 14,
+    fontFamily: 'inherit',
+    background: '#fff',
+    color: '#111827',
+    outline: 'none',
+  },
+  headerActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  filterButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '0 16px',
+    height: 44,
+    background: '#fff',
+    color: '#374151',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: 500,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  filterButtonIcon: {
+    width: 15,
+    height: 15,
+  },
+  postButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '0 20px',
+    height: 44,
+    background: '#111827',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: 500,
+    fontFamily: 'inherit',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    textDecoration: 'none',
+  },
+  filterPanel: {
+    position: 'absolute',
+    top: 64,
+    left: 0,
+    right: 0,
+    zIndex: 29,
+    backgroundColor: '#fff',
+    borderBottom: '1px solid #e5e7eb',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+  },
+  filterPanelContent: {
+    maxWidth: 1200,
+    margin: '0 auto',
+    padding: '24px',
+  },
+  filterTitle: {
+    fontSize: 16,
+    fontWeight: 600,
+    marginBottom: 16,
+    color: '#111827',
+  },
+  filterGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: 16,
+    marginBottom: 20,
+  },
+  filterGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: 500,
+    color: '#6b7280',
+  },
+  filterInput: {
+    padding: '8px 12px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 6,
+    fontSize: 14,
+  },
+  filterSelect: {
+    padding: '8px 12px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 6,
+    fontSize: 14,
+    background: '#fff',
+  },
+  filterActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  clearFilterButton: {
+    padding: '8px 16px',
+    background: '#f3f4f6',
+    border: 'none',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontSize: 14,
+  },
+  applyFilterButton: {
+    padding: '8px 16px',
+    background: '#111827',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontSize: 14,
+  },
+  main: {
+    maxWidth: 1200,
+    margin: '0 auto',
+    padding: '32px 24px',
+    position: 'relative',
+  },
+  toolbar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  categoriesContainer: {
+    display: 'flex',
+    gap: 6,
+    overflowX: 'auto',
+    flexWrap: 'wrap',
+  },
+  categoryButton: {
+    padding: '7px 16px',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    border: '1px solid transparent',
+    background: 'none',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+    color: '#6b7280',
+  },
+  categoryButtonActive: {
+    background: '#111827',
+    color: '#fff',
+    borderColor: '#111827',
+  },
+  rightControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
+  },
+  sortContainer: {
+    position: 'relative',
+  },
+  sortSelect: {
+    padding: '0 16px',
+    height: 44,
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
+  viewToggle: {
+    display: 'flex',
+    gap: 4,
+  },
+  viewButton: {
+    width: 36,
+    height: 36,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    background: '#fff',
+    cursor: 'pointer',
+    color: '#6b7280',
+  },
+  viewButtonActive: {
+    background: '#111827',
+    color: '#fff',
+    borderColor: '#111827',
+  },
+  viewButtonIcon: {
+    width: 15,
+    height: 15,
+  },
+  countText: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginBottom: 20,
+  },
+  countStrong: {
+    color: '#111827',
+  },
+  loadingBadge: {
+    fontSize: 12,
+    color: '#6366f1',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(255, 255, 255, 0.8)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  loadingOverlayIcon: {
+    width: 32,
+    height: 32,
+    color: '#6366f1',
+  },
+  gridContainer: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+    gap: 20,
+  },
+  gridCard: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: 24,
+    transition: 'all 0.2s',
+  },
+  cardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  cardTags: {
+    display: 'flex',
+    gap: 6,
+    alignItems: 'center',
+  },
+  categoryPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: '3px 10px',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  urgentPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '3px 8px',
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 600,
+    background: '#fef2f2',
+    color: '#dc2626',
+    border: '1px solid #fecaca',
+  },
+  urgentDot: {
+    width: 5,
+    height: 5,
+    borderRadius: '50%',
+    background: '#dc2626',
+    display: 'inline-block',
+  },
+  favButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 4,
+    display: 'flex',
+    alignItems: 'center',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 600,
+    color: '#111827',
+    marginBottom: 8,
+    lineHeight: 1.4,
+    letterSpacing: '-0.01em',
+  },
+  cardDescription: {
+    fontSize: 13.5,
+    color: '#6b7280',
+    lineHeight: 1.6,
+    marginBottom: 16,
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    overflow: 'hidden',
+  },
+  cardMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18,
+  },
+  metaTag: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 5,
+    fontSize: 12.5,
+    color: '#6b7280',
+  },
+  metaIcon: {
+    width: 13,
+    height: 13,
+  },
+  divider: {
+    width: 1,
+    height: 16,
+    background: '#e5e7eb',
+  },
+  cardFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    borderTop: '1px solid #f3f4f6',
+  },
+  userInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#fff',
+    flexShrink: 0,
+  },
+  userName: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#111827',
+  },
+  stars: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 3,
+  },
+  starIcon: {
+    width: 11,
+    height: 11,
+    color: '#f59e0b',
+    fill: '#f59e0b',
+  },
+  rating: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  reviewCount: {
+    color: '#9ca3af',
+  },
+  budgetInfo: {
+    textAlign: 'right',
+  },
+  budgetText: {
+    fontSize: 17,
+    fontWeight: 700,
+    color: '#111827',
+    fontFamily: "'DM Serif Display', serif",
+  },
+  distanceText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 1,
+  },
+  applyButton: {
+    width: '100%',
+    marginTop: 16,
+    padding: '10px',
+    background: '#111827',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+  },
+  listContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  listCard: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 20,
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: 24,
+  },
+  listAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 12,
+    fontWeight: 700,
+    color: '#fff',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  listContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  listHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  listInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  listTags: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+    flexWrap: 'wrap',
+  },
+  listTitle: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#111827',
+    marginBottom: 4,
+    letterSpacing: '-0.01em',
+  },
+  listDescription: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 1.5,
+    marginBottom: 10,
+  },
+  listMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+  },
+  listActions: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 10,
+    flexShrink: 0,
+  },
+  listBudget: {
+    fontSize: 17,
+    fontWeight: 700,
+    color: '#111827',
+    fontFamily: "'DM Serif Display', serif",
+  },
+  listApplyButton: {
+    padding: '8px 16px',
+    background: '#111827',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+    height: 36,
+  },
+  pagination: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 32,
+    paddingTop: 24,
+    borderTop: '1px solid #e5e7eb',
+  },
+  paginationButton: {
+    padding: '8px 16px',
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 6,
+    cursor: 'pointer',
+    fontSize: 14,
+  },
+  paginationButtonDisabled: {
+    opacity: 0.5,
+    cursor: 'not-allowed',
+  },
+  paginationInfo: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
 };
 
 export default Tasks;
