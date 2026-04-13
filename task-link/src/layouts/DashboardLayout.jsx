@@ -7,8 +7,8 @@ import {
   Plus, User, Briefcase, Star
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { logout, setUserType } from '@/features/auth/authSlice';  // ✅ حذف updateUser
 import { fetchUnreadCount, markNotificationsAsRead } from '@/features/notifications/notificationsSlice';
 

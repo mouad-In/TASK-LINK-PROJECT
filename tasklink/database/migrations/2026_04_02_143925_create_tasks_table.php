@@ -14,10 +14,10 @@ return new class extends Migration
             // Basic info — CreateTask.jsx
             $table->string('title');
             $table->text('description');
-            $table->enum('category', [
-                'Plumbing', 'Electrical', 'Carpentry', 'Painting',
-                'Cleaning', 'Moving Help', 'Gardening', 'Assembly', 'Other',
-            ]);
+           $table->enum('category', [
+    'Cleaning', 'Repairs', 'Moving', 'IT Help',
+    'Painting', 'Home Care', 'Gardening', 'Photography',
+]);
             $table->enum('urgency', ['low', 'medium', 'high'])->default('medium');
             $table->decimal('budget', 10, 2);
             $table->string('location');

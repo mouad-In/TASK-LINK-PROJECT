@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Application; // ← أضف هذا
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Tymon\JWTAuth\Contracts\JWTSubject;
-
+use PHPOpenSourceSaver\JWTAuth\Contracts\JWTSubject;
 class User extends Authenticatable implements JWTSubject
 {
     use Notifiable;
@@ -56,10 +56,10 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(Task::class, 'assigned_worker_id');
     }
 
-    public function applications()
-    {
-        return $this->hasMany(TaskApplication::class, 'worker_id');
-    }
+   public function applications()
+{
+    return $this->hasMany(Application::class, 'worker_id');
+}
 
     public function favorites()
     {

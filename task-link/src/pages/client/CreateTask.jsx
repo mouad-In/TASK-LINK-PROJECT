@@ -22,9 +22,9 @@ import {
   X,
   AlertCircle
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -127,34 +127,26 @@ const CreateTask = () => {
     setUploadedImages(uploadedImages.filter(img => img.id !== imageId));
   };
 
-  const handleSubmit = async () => {
-    if (!validateStep(3)) return;
-    
-    // Prepare task data for API
-    const taskData = {
-      title: formData.title,
-      description: formData.description,
-      category: selectedCategory,
-      budget: parseFloat(formData.budget),
-      budget_type: 'Fixed Price',
-      location: formData.location || formData.address,
-      address: formData.address,
-      city: formData.city,
-      postal_code: formData.postal_code,
-      due_date: formData.due_date,
-      client_id: profile?.id,
-      status: 'open',
-      urgency: formData.budget > 200 ? 'high' : 'normal', // Simple logic for urgency
-    };
-    
-    try {
-      const result = await dispatch(createTask(taskData)).unwrap();
-      // Navigate to task details or dashboard
-      navigate(`/client/tasks/${result.id}`);
-    } catch (err) {
-      console.error('Failed to create task:', err);
-    }
+ const handleSubmit = async () => {
+  if (!validateStep(3)) return;
+  
+  const taskData = {
+    title: formData.title,
+    description: formData.description,
+    category: selectedCategory.toLowerCase(), // ✅ lowercase
+    budget: parseFloat(formData.budget),
+    location: formData.location || formData.address,
+    urgency: parseFloat(formData.budget) > 200 ? 'high' : 'medium', // ✅ medium بدل normal
+    requiredSkills: [],
   };
+  
+  try {
+    const result = await dispatch(createTask(taskData)).unwrap();
+    navigate('/client/dashboard');
+  } catch (err) {
+    console.error('Failed to create task:', err);
+  }
+};
 
   const getSelectedCategoryData = () => {
     return categories.find(cat => cat.name === selectedCategory);

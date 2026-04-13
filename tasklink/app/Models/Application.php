@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class TaskApplication extends Model
+class Application extends Model  // ← غيّر من TaskApplication إلى Application
 {
     protected $fillable = [
         'task_id', 'worker_id', 'price', 'message', 'status',

@@ -11,11 +11,11 @@ const api = axios.create({
 // 🔐 REQUEST INTERCEPTOR
 api.interceptors.request.use(
   (config) => {
-    const user = JSON.parse(localStorage.getItem('user'));
+    const token = localStorage.getItem('token'); // ✅ يقرأ token مباشرة
+    console.log("TOKEN:", token);
 
-    // ✅ بدّل access_token إلى token
-    if (user?.token) {
-      config.headers.Authorization = `Bearer ${user.token}`;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
     return config;
@@ -34,7 +34,8 @@ api.interceptors.response.use(
 
     // Unauthorized — token expired أو غير صالح
     if (error.response?.status === 401) {
-      localStorage.removeItem('user');
+      localStorage.removeItem('token'); // ✅
+      localStorage.removeItem('user');  // ✅
 
       if (window.location.pathname !== '/login') {
         window.location.href = '/login';
