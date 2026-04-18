@@ -1,3 +1,4 @@
+// store/admin/adminSlice.js (updated)
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { userService, taskService } from '@/services/api';
 
@@ -67,7 +68,7 @@ export const fetchRevenueData = createAsyncThunk(
     try {
       const tasks = await taskService.getAllTasks();
 
-      // نجمّع البيانات حسب الشهر
+      // Group data by month
       const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                           'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -187,6 +188,32 @@ export const deleteUser = createAsyncThunk(
     try {
       await userService.updateUser(userId, { deleted: true });
       return userId;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// NEW: Update Task Status
+export const updateTaskStatus = createAsyncThunk(
+  'admin/updateTaskStatus',
+  async ({ taskId, status }, { rejectWithValue }) => {
+    try {
+      const data = await taskService.updateTask(taskId, { status });
+      return data;
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// NEW: Delete Task
+export const deleteTask = createAsyncThunk(
+  'admin/deleteTask',
+  async (taskId, { rejectWithValue }) => {
+    try {
+      await taskService.deleteTask(taskId);
+      return taskId;
     } catch (err) {
       return rejectWithValue(err.response?.data?.message || err.message);
     }
@@ -317,6 +344,37 @@ const adminSlice = createSlice({
       // deleteUser
       .addCase(deleteUser.fulfilled, (state, action) => {
         state.users = state.users.filter(u => u.id !== action.payload);
+      })
+
+      // NEW: updateTaskStatus
+      .addCase(updateTaskStatus.fulfilled, (state, action) => {
+        const updated = action.payload;
+        // Update in recentTasks
+        const taskIndex = state.recentTasks.findIndex(t => t.id === updated.id);
+        if (taskIndex !== -1) {
+          state.recentTasks[taskIndex] = { ...state.recentTasks[taskIndex], ...updated };
+        }
+        // Also update in tasks array if it exists
+        if (state.tasks) {
+          const tasksIndex = state.tasks.findIndex(t => t.id === updated.id);
+          if (tasksIndex !== -1) {
+            state.tasks[tasksIndex] = { ...state.tasks[tasksIndex], ...updated };
+          }
+        }
+      })
+      .addCase(updateTaskStatus.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+
+      // NEW: deleteTask
+      .addCase(deleteTask.fulfilled, (state, action) => {
+        state.recentTasks = state.recentTasks.filter(t => t.id !== action.payload);
+        if (state.tasks) {
+          state.tasks = state.tasks.filter(t => t.id !== action.payload);
+        }
+      })
+      .addCase(deleteTask.rejected, (state, action) => {
+        state.error = action.payload;
       })
 
       // fetchRecentTasks

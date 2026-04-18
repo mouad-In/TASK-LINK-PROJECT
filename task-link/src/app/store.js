@@ -1,3 +1,4 @@
+// store/index.js
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../features/auth/authSlice';
 import usersReducer from '../features/users/usersSlice';
@@ -14,7 +15,9 @@ import workerReducer from '../features/worker/workerSlice';
 import favoritesReducer from '../features/favorite/favoritesSlice';
 import adminReducer from '../features/admin/adminSlice';
 import contactReducer from '../features/contact/contactSlice';
-import settingsReducer from '@/features/settings/settingsSlice';
+import userSettingsReducer from '@/features/settings/settingsSlice';
+import adminSettingsReducer from '@/features/admin/settingsSlice';
+import savedTasksReducer from '@/features/tasks/savedTasksSlice';
 
 export const store = configureStore({
   reducer: {
@@ -33,6 +36,8 @@ export const store = configureStore({
     favorites: favoritesReducer,
     admin: adminReducer,
     contact: contactReducer,
-    settings: settingsReducer,
+    userSettings: userSettingsReducer,
+    adminSettings: adminSettingsReducer,
+    savedTasks: savedTasksReducer,
   },
 });

@@ -1,3 +1,4 @@
+// services/api/apiService.js
 import api from './axiosInstance.js';
 
 // Auth Service - Real API calls
@@ -176,7 +177,7 @@ export const reviewService = {
   },
 };
 
-// أضف هذا في نهاية ملف apiService.js
+// Favorites Service
 export const favoritesService = {
   async getFavorites(clientId) {
     const response = await api.get(`/favorites/${clientId}`);
@@ -190,6 +191,96 @@ export const favoritesService = {
 
   async removeFavorite(clientId, workerId) {
     await api.delete(`/favorites/${clientId}/${workerId}`);
+    return true;
+  },
+};
+
+// Admin Service - NEW
+export const adminService = {
+  // Settings endpoints
+  async getSettings() {
+    const response = await api.get('/admin/settings');
+    return response.data;
+  },
+
+  async updateSettings(settings) {
+    const response = await api.put('/admin/settings', settings);
+    return response.data;
+  },
+
+  // Dashboard stats
+  async getStats({ range }) {
+    const response = await api.get('/admin/stats', { params: { range } });
+    return response.data;
+  },
+
+  async getRevenueData({ range }) {
+    const response = await api.get('/admin/revenue', { params: { range } });
+    return response.data;
+  },
+
+  async getCategoryData() {
+    const response = await api.get('/admin/categories');
+    return response.data;
+  },
+
+  async getWeeklyActivity() {
+    const response = await api.get('/admin/activity');
+    return response.data;
+  },
+
+  // User management
+  async getUsers({ page, search }) {
+    const response = await api.get('/admin/users', { params: { page, search } });
+    return response.data;
+  },
+
+  async updateUserStatus(userId, status) {
+    const response = await api.put(`/admin/users/${userId}`, { status });
+    return response.data;
+  },
+
+  async deleteUser(userId) {
+    const response = await api.delete(`/admin/users/${userId}`);
+    return response.data;
+  },
+
+  // Task management
+  async getRecentTasks() {
+    const response = await api.get('/admin/tasks/recent');
+    return response.data;
+  },
+
+  async getAnalytics({ range }) {
+    const response = await api.get('/admin/analytics', { params: { range } });
+    return response.data;
+  },
+
+  async updateTaskStatus(taskId, status) {
+    const response = await api.put(`/admin/tasks/${taskId}`, { status });
+    return response.data;
+  },
+
+  async deleteTask(taskId) {
+    const response = await api.delete(`/admin/tasks/${taskId}`);
+    return response.data;
+  },
+};
+
+// Saved Tasks Service
+export const savedTasksService = {
+  async getSavedTasks() {
+    const response = await api.get('/saved-tasks');
+    return response.data;
+  },
+
+  async saveTask(taskId) {
+    const response = await api.post('/saved-tasks', { task_id: taskId }); // ← fixed
+    return response.data;
+  },
+
+  async unsaveTask(taskId) {
+    await api.delete(`/saved-tasks/${taskId}`);
     return true;
   },
 };

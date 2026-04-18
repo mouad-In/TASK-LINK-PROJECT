@@ -62,7 +62,7 @@ import { addToast } from '@/features/notifications/notificationsSlice';
 const Settings = () => {
   const dispatch = useDispatch();
   const { userType, user } = useSelector((state) => state.auth);
-  const { notificationPrefs } = useSelector((state) => state.settings);
+  const { notificationPrefs } = useSelector((state) => state.userSettings);
   const { theme, toggleTheme } = useTheme();
   
   // Profile state

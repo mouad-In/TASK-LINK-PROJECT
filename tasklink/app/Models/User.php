@@ -117,4 +117,15 @@ class User extends Authenticatable implements JWTSubject
     {
         return round($this->reviewsReceived()->avg('rating') ?? 0, 1);
     }
+    public function savedTasks(): BelongsToMany
+{
+    return $this->belongsToMany(Task::class, 'saved_tasks')
+                ->withTimestamps();
+}
+ 
+public function savedTaskRecords(): HasMany
+{
+    return $this->hasMany(SavedTask::class);
+}
+ 
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\TaskController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\SavedTaskController;
 
 /*
 |--------------------------------------------------------------------------
@@ -71,4 +72,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/reviews/user/{userId}', [ReviewController::class, 'getByUser']);
     Route::get('/reviews',               [ReviewController::class, 'index']);
     Route::post('/reviews',              [ReviewController::class, 'store']);
+    // SavedTasks
+
+    Route::get('/saved-tasks',             [SavedTaskController::class, 'index']);
+    Route::post('/saved-tasks',            [SavedTaskController::class, 'store']);
+    Route::delete('/saved-tasks/{task}',   [SavedTaskController::class, 'destroy']);
 });

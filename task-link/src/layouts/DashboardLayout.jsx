@@ -17,7 +17,6 @@ const clientNavItems = [
   { icon: ClipboardList, label: 'My Tasks', path: '/client/tasks' },
   { icon: MessageSquare, label: 'Messages', path: '/client/messages' },
   { icon: Heart, label: 'Favorites', path: '/client/favorites' },
-  { icon: User, label: 'Profile', path: '/profile' },
   { icon: Settings, label: 'Settings', path: '/client/settings' },
 ];
 
@@ -25,10 +24,8 @@ const workerNavItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/worker/dashboard' },
   { icon: ClipboardList, label: 'Find Tasks', path: '/worker/tasks' },
   { icon: MessageSquare, label: 'Messages', path: '/worker/messages' },
-  { icon: Heart, label: 'Saved', path: '/worker/saved' },
-  { icon: Briefcase, label: 'My Applications', path: '/worker/applications' },
+  { icon: Heart, label: 'Saved', path: '/worker/saved' },,
   { icon: Star, label: 'Reviews', path: '/worker/reviews' },
-  { icon: User, label: 'Profile', path: '/profile' },
   { icon: Settings, label: 'Settings', path: '/worker/settings' },
 ];
 

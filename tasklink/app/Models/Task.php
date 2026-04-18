@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Task extends Model
@@ -38,5 +40,16 @@ class Task extends Model
     public function review()
     {
         return $this->hasOne(Review::class);
+
     }
+
+     public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
+    public function savedByUsers(): BelongsToMany
+{
+    return $this->belongsToMany(User::class, 'saved_tasks')
+                ->withTimestamps();
+}
 }
