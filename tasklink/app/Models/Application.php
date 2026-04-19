@@ -4,13 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Application extends Model  // ← غيّر من TaskApplication إلى Application
+class Application extends Model
 {
     protected $fillable = [
-        'task_id', 'worker_id', 'price', 'message', 'status',
+        'task_id', 'worker_id', 'price', 'delivery_time', 'message', 'status',
     ];
 
-    const STATUSES = ['pending', 'accepted', 'rejected', 'withdrawn'];
+    const STATUSES = ['pending', 'accepted', 'rejected'];
 
     public function task()
     {
