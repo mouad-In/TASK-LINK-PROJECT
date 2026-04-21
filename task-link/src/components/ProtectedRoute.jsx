@@ -9,6 +9,7 @@ const ProtectedRoute = ({ children, allowedUserTypes = [] }) => {
   }
   
   if (allowedUserTypes.length > 0 && userType && !allowedUserTypes.includes(userType)) {
+    if (userType === 'admin') return <Navigate to="/admin" replace />;
     const redirectPath = userType === 'client' ? '/client/dashboard' : '/worker/dashboard';
     return <Navigate to={redirectPath} replace />;
   }

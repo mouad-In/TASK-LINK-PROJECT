@@ -15,7 +15,7 @@ import {
   Bell,
   Shield
 } from 'lucide-react';
-import { logout, setUserType } from '@/features/auth/authSlice'; 
+import { logout } from '@/features/auth/authSlice'; 
 
 const adminNav = [
   { icon: LayoutDashboard, label: 'Overview', path: '/admin' },
@@ -32,7 +32,7 @@ export const AdminLayout = ({ children, title }) => {
   const dispatch = useDispatch();
   const handleLogout = () => {
       dispatch(logout());
-      navigate('/');
+      navigate('/auth');
     };
 
   return (

@@ -16,7 +16,9 @@ import { Input } from '@/components/ui/Input';
 import {
   fetchTaskById,
   clearCurrentTask,
-} from '@/features/tasks/tasksSlice'; // ← adjust path to your slice
+} from '@/features/tasks/tasksSlice';
+
+import { createApplication } from '@/features/applications/applicationsSlice';
 
 // ── Mock Proposals (until you have a proposalsSlice) ──────────────────────────
 
@@ -26,9 +28,6 @@ const MOCK_PROPOSALS = [
   { id: 3, name: 'David Kim',      avatar: 'DK', rating: 5.0, reviews: 18,  price: 130, message: 'New to the platform but 8 years in the industry. References available.',               completedTasks: 18  },
   { id: 4, name: 'Priya Patel',    avatar: 'PP', rating: 4.8, reviews: 56,  price: 160, message: 'Top-rated cleaner with eco-friendly approach. Fully insured and background checked.',  completedTasks: 112 },
 ];
-
-// Demo flag — swap with real auth selector when ready
-const DEMO_USER_TYPE = 'worker'; // 'client' | 'worker'
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -42,13 +41,18 @@ const TaskDetails = () => {
   const isLoading = useSelector((state) => state.tasks.isLoading);
   const error     = useSelector((state) => state.tasks.error);
 
+  // Read real user from auth state
+  const currentUser = useSelector((state) => state.auth.user);
+  const isClient = currentUser?.role === 'client';
+
   // ── Local UI state ──
   const [saved,           setSaved]           = useState(false);
   const [showApplyForm,   setShowApplyForm]   = useState(false);
   const [proposalPrice,   setProposalPrice]   = useState('');
   const [proposalMessage, setProposalMessage] = useState('');
-
-  const isClient = DEMO_USER_TYPE === 'client';
+  const [isApplying,      setIsApplying]      = useState(false);
+  const [applyError,      setApplyError]      = useState(null);
+  const [applySuccess,    setApplySuccess]    = useState(false);
 
   // ── Fetch task on mount / id change ──
   useEffect(() => {
@@ -57,6 +61,30 @@ const TaskDetails = () => {
     // Clean up currentTask when leaving the page
     return () => dispatch(clearCurrentTask());
   }, [id, dispatch]);
+
+  // ── Submit proposal handler ──
+  const handleSubmitProposal = async () => {
+    if (!proposalPrice || !proposalMessage) return;
+    setIsApplying(true);
+    setApplyError(null);
+    try {
+      const result = await dispatch(createApplication({
+        task_id: id,
+        price: proposalPrice,
+        message: proposalMessage,
+      }));
+      if (createApplication.fulfilled.match(result)) {
+        setApplySuccess(true);
+        setShowApplyForm(false);
+        setProposalPrice('');
+        setProposalMessage('');
+      } else {
+        setApplyError(result.payload || 'Failed to submit proposal. Please try again.');
+      }
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   // ── Loading ──
   if (isLoading) {
@@ -310,16 +338,26 @@ const TaskDetails = () => {
                         className="bg-muted border-border resize-none"
                       />
                     </div>
+                    {applyError && (
+                      <p className="text-sm text-destructive">{applyError}</p>
+                    )}
                     <Button
                       className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
                       size="lg"
-                      disabled={!proposalPrice || !proposalMessage}
+                      disabled={!proposalPrice || !proposalMessage || isApplying}
+                      onClick={handleSubmitProposal}
                     >
-                      <Send className="w-4 h-4 mr-2" /> Submit Proposal
+                      <Send className="w-4 h-4 mr-2" />
+                      {isApplying ? 'Submitting...' : 'Submit Proposal'}
                     </Button>
                     <Button variant="ghost" className="w-full" onClick={() => setShowApplyForm(false)}>
                       Cancel
                     </Button>
+                  </div>
+                ) : applySuccess ? (
+                  <div className="text-center py-4 space-y-2">
+                    <p className="text-emerald-500 font-semibold text-lg">✅ Proposal Submitted!</p>
+                    <p className="text-sm text-muted-foreground">The client will review your proposal soon.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">

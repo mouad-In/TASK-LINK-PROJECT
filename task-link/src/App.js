@@ -30,6 +30,7 @@ import MessagesWorker from "./pages/MessagesWrorker";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
 import { ThemeProvider } from "@/components/hooks/use-theme";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Create QueryClient instance
 const queryClient = new QueryClient({
@@ -83,13 +84,13 @@ const App = () => {
                 <Route path="/worker/saved" element={<SavedTasks />} />
                 
                 {/* Admin Routes */}
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/admin/users/:id" element={<Profile />} />
-                <Route path="/admin/tasks" element={<AdminTasks />} />
-                <Route path="/admin/tasks/:id" element={<TaskDetails />} />
-                <Route path="/admin/analytics" element={<AdminAnalytics />} />
-                <Route path="/admin/settings" element={<AdminSettings />} />
+                <Route path="/admin" element={<ProtectedRoute allowedUserTypes={['admin']}><AdminDashboard /></ProtectedRoute>} />
+                <Route path="/admin/users" element={<ProtectedRoute allowedUserTypes={['admin']}><AdminUsers /></ProtectedRoute>} />
+                <Route path="/admin/users/:id" element={<ProtectedRoute allowedUserTypes={['admin']}><Profile /></ProtectedRoute>} />
+                <Route path="/admin/tasks" element={<ProtectedRoute allowedUserTypes={['admin']}><AdminTasks /></ProtectedRoute>} />
+                <Route path="/admin/tasks/:id" element={<ProtectedRoute allowedUserTypes={['admin']}><TaskDetails /></ProtectedRoute>} />
+                <Route path="/admin/analytics" element={<ProtectedRoute allowedUserTypes={['admin']}><AdminAnalytics /></ProtectedRoute>} />
+                <Route path="/admin/settings" element={<ProtectedRoute allowedUserTypes={['admin']}><AdminSettings /></ProtectedRoute>} />
                 
                 {/* Shared Routes */}
                 <Route path="/profile" element={<Profile />} />
