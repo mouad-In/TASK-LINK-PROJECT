@@ -1,6 +1,8 @@
 // AdminLayout.jsx
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
+
 import {
   LayoutDashboard,
   Users,
@@ -13,6 +15,7 @@ import {
   Bell,
   Shield
 } from 'lucide-react';
+import { logout, setUserType } from '@/features/auth/authSlice'; 
 
 const adminNav = [
   { icon: LayoutDashboard, label: 'Overview', path: '/admin' },
@@ -26,6 +29,11 @@ export const AdminLayout = ({ children, title }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const handleLogout = () => {
+      dispatch(logout());
+      navigate('/');
+    };
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -76,7 +84,7 @@ export const AdminLayout = ({ children, title }) => {
 
           <div className="p-4 border-t border-border">
             <button
-              onClick={() => navigate('/')}
+              onClick={handleLogout}
               className="flex items-center gap-3 px-4 py-3 w-full text-muted-foreground hover:bg-muted rounded-xl transition-all"
             >
               <LogOut className="w-5 h-5" />

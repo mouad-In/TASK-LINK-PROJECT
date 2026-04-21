@@ -7,10 +7,15 @@ export const HeroSection = () => {
 
   return (
     <div style={{
-      position: 'relative', zIndex: 10,
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      minHeight: '100vh', padding: '3rem 1rem',
+      position: 'relative',
+      zIndex: 10,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '100vh',
+      padding: '3rem 1rem',
+      background: 'radial-gradient(circle at 20% 50%, rgba(139, 92, 246, 0.1), transparent 50%)',
     }}>
       {/* Social proof badge */}
       <motion.div
@@ -18,7 +23,14 @@ export const HeroSection = () => {
         animate={mounted ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.8, delay: 0.1 }}
         className="glass-card"
-        style={{ marginBottom: '2rem', padding: '0.75rem 1.5rem', borderRadius: '9999px' }}
+        style={{ 
+          marginBottom: '2rem', 
+          padding: '0.75rem 1.5rem', 
+          borderRadius: '9999px',
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+        }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{ display: 'flex' }}>
@@ -27,16 +39,20 @@ export const HeroSection = () => {
               'linear-gradient(135deg,#06b6d4,#3b82f6)',
               'linear-gradient(135deg,#8b5cf6,#d946ef)',
             ].map((bg, i) => (
-              <div key={i} className="animate-pulse" style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: bg, border: '2px solid rgba(255,255,255,0.4)',
+              <div key={i} style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: bg,
+                border: '2px solid rgba(255,255,255,0.4)',
                 marginLeft: i > 0 ? -8 : 0,
+                animation: 'pulse 2s infinite',
                 animationDelay: `${i * 0.2}s`,
               }} />
             ))}
           </div>
           <span style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 500 }}>
-            Joined by 15,000+ professionals
+            ⭐ Joined by 15,000+ professionals
           </span>
         </div>
       </motion.div>
@@ -47,10 +63,24 @@ export const HeroSection = () => {
         animate={mounted ? { opacity: 1, scale: 1 } : {}}
         transition={{ duration: 0.6, delay: 0.2 }}
         className="glass-card"
-        style={{ marginBottom: '2rem', padding: '1.5rem', cursor: 'pointer' }}
-        whileHover={{ rotate: 12 }}
+        style={{ 
+          marginBottom: '2rem', 
+          padding: '1.5rem', 
+          cursor: 'pointer',
+          background: 'rgba(255, 255, 255, 0.05)',
+          backdropFilter: 'blur(10px)',
+          borderRadius: '20px',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+        }}
+        whileHover={{ rotate: 12, scale: 1.1 }}
       >
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-pulse">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="url(#gradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#d946ef" />
+              <stop offset="100%" stopColor="#06b6d4" />
+            </linearGradient>
+          </defs>
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
@@ -67,14 +97,27 @@ export const HeroSection = () => {
           textAlign: 'center',
           marginBottom: '1.5rem',
           maxWidth: '900px',
-          lineHeight: 1.1,
+          lineHeight: 1.2,
         }}
       >
         <span style={{ color: 'white' }}>Connect your </span>
-        <span className="text-gradient-accent animate-pulse">tasks</span>
+        <span style={{
+          background: 'linear-gradient(135deg, #d946ef, #9333ea)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          animation: 'pulse 2s infinite',
+        }}>tasks</span>
         <br />
         <span style={{ color: 'white' }}>to the </span>
-        <span className="text-gradient-cyan animate-pulse" style={{ animationDelay: '0.5s' }}>best talents</span>
+        <span style={{
+          background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          animation: 'pulse 2s infinite',
+          animationDelay: '0.5s',
+        }}>best talents</span>
       </motion.h1>
 
       {/* Subtitle */}
@@ -83,8 +126,8 @@ export const HeroSection = () => {
         animate={mounted ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.8, delay: 0.6 }}
         style={{
-          color: 'rgba(255,255,255,0.8)',
-          fontSize: '1.125rem',
+          color: 'rgba(255,255,255,0.85)',
+          fontSize: '1.2rem',
           textAlign: 'center',
           maxWidth: '640px',
           marginBottom: '3rem',
@@ -100,61 +143,97 @@ export const HeroSection = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={mounted ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.8, delay: 0.8 }}
-        style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '5rem' }}
+        style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '5rem' }}
       >
         <Link
           to="/auth?role=client"
-          className="glass-card"
           style={{
             padding: '1rem 2rem',
             fontWeight: 600,
             color: 'white',
             textDecoration: 'none',
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-            transition: 'all 0.3s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            transition: 'all 0.3s ease',
             fontSize: '1rem',
+            background: 'linear-gradient(135deg, rgba(217, 70, 239, 0.2), rgba(147, 51, 234, 0.2))',
+            borderRadius: '12px',
+            border: '1px solid rgba(217, 70, 239, 0.5)',
+            backdropFilter: 'blur(10px)',
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'rgba(232,121,249,0.6)';
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 0 40px rgba(232,121,249,0.4)';
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(217, 70, 239, 0.4), rgba(147, 51, 234, 0.4))';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 10px 30px rgba(217, 70, 239, 0.3)';
+            e.currentTarget.style.borderColor = 'rgba(217, 70, 239, 0.8)';
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(217, 70, 239, 0.2), rgba(147, 51, 234, 0.2))';
+            e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.borderColor = 'rgba(217, 70, 239, 0.5)';
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <line x1="19" y1="8" x2="19" y2="14"/>
+            <line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
           Start as Client
         </Link>
         <Link
           to="/auth?role=worker"
-          className="glass-card"
           style={{
             padding: '1rem 2rem',
             fontWeight: 600,
             color: 'white',
             textDecoration: 'none',
-            display: 'flex', alignItems: 'center', gap: '0.5rem',
-            transition: 'all 0.3s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            transition: 'all 0.3s ease',
             fontSize: '1rem',
+            background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2))',
+            borderRadius: '12px',
+            border: '1px solid rgba(6, 182, 212, 0.5)',
+            backdropFilter: 'blur(10px)',
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'rgba(34,211,238,0.6)';
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 0 40px rgba(34,211,238,0.4)';
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6, 182, 212, 0.4), rgba(59, 130, 246, 0.4))';
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = '0 10px 30px rgba(6, 182, 212, 0.3)';
+            e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.8)';
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(59, 130, 246, 0.2))';
+            e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = 'none';
+            e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.5)';
           }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
           Join as Worker
         </Link>
       </motion.div>
+
+      {/* Add keyframes animation for pulse */}
+      <style >{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.7;
+          }
+        }
+      `}</style>
     </div>
   );
 };

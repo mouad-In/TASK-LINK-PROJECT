@@ -12,8 +12,9 @@ import {
   TestimonialsSection,
   ChatButton,
   FooterSection,
+  //ThreeDBackground,
 } from '../components/landing';
-
+import ThreeDBackground from '../components/landing/ThreeDBackground';
 const LandingPage = () => {
   const dispatch = useDispatch();
 
@@ -28,6 +29,7 @@ const LandingPage = () => {
       position: 'relative',
       overflowX: 'hidden',
     }}>
+      <ThreeDBackground />
       <CosmicBackground />
 
       <HeroSection />
