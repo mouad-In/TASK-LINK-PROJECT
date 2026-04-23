@@ -33,7 +33,7 @@ export const store = configureStore({
     profile: profileReducer,
     client: clientReducer,
     worker: workerReducer,
-    favorites: favoritesReducer,
+    taskFavorites: favoritesReducer,
     admin: adminReducer,
     contact: contactReducer,
     userSettings: userSettingsReducer,

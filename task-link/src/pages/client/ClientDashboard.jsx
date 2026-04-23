@@ -26,7 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Redux actions from your existing slices
 import { fetchTasks, updateTask, deleteTask } from '@/features/tasks/tasksSlice';
-import { fetchClientStats, fetchBudgetAnalytics } from '@/features/client/clientSlice';
+import { fetchClientStats, fetchBudgetAnalytics, fetchClientProfile } from '@/features/client/clientSlice';
 
 const ClientDashboard = () => {
   const dispatch = useDispatch();
@@ -36,13 +36,24 @@ const ClientDashboard = () => {
   // Selectors from Redux store
   const { tasks, isLoading: tasksLoading, error: tasksError } = useSelector((state) => state.tasks);
   const { profile, stats, budgetAnalytics, isLoading: clientLoading } = useSelector((state) => state.client);
-  
+  const authUser = useSelector((state) => state.auth.user);
+
+  // Resolve the effective user ID from either client profile or auth state
+  const userId = profile?.id ?? authUser?.id;
+
+  // If profile isn't loaded yet but we have an auth user, fetch it
   useEffect(() => {
-    // Fetch data on component mount
-    dispatch(fetchTasks({ client_id: profile?.id, per_page: 10 }));
-    dispatch(fetchClientStats(profile?.id));
-    dispatch(fetchBudgetAnalytics(profile?.id));
-  }, [dispatch, profile?.id]);
+    if (!profile && authUser?.id) {
+      dispatch(fetchClientProfile(authUser.id));
+    }
+  }, [dispatch, profile, authUser?.id]);
+
+  useEffect(() => {
+    if (!userId) return;
+    dispatch(fetchTasks({ client_id: userId, per_page: 10 }));
+    dispatch(fetchClientStats(userId));
+    dispatch(fetchBudgetAnalytics(userId));
+  }, [dispatch, userId]);
   
   // Filter tasks based on active tab
   const getFilteredTasks = () => {

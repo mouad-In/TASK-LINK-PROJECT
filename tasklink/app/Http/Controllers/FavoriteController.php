@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TaskFavorite;
+use App\Models\Favorite;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,7 +13,7 @@ class FavoriteController extends Controller
         $this->middleware('auth:api');
     }
 
-    // GET /api/task-favorites/{clientId}
+    // GET favorites of user
     public function index(int $clientId): JsonResponse
     {
         $user = auth('api')->user();
@@ -22,47 +22,46 @@ class FavoriteController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $favorites = TaskFavorite::where('client_id', $clientId)
-            ->with('task:id,title,description,category,budget,budget_type,status,location,created_at')
-            ->get()
-            ->map(fn($f) => $f->task);
+        $favorites = Favorite::where('client_id', $clientId)
+            ->with('task:id,title,description,category,budget,status,location,created_at')->get()
+            ->map(fn($fav) => $fav->task);
 
         return response()->json($favorites);
     }
 
-    // POST /api/task-favorites
+    // ADD favorite
     public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'client_id' => 'required|integer|exists:users,id',
-            'task_id' => 'required|integer|exists:tasks,id',
+            'client_id' => 'required|exists:users,id',
+            'task_id' => 'required|exists:tasks,id',
         ]);
 
         $user = auth('api')->user();
-        if ($user->id !== $request->client_id && $user->role !== 'admin') {
+
+        if ($user->id !== (int) $request->client_id && $user->role !== 'admin') {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        // Check if already favorited
-        $exists = TaskFavorite::where('client_id', $request->client_id)
+        $exists = Favorite::where('client_id', $request->client_id)
             ->where('task_id', $request->task_id)
             ->exists();
 
         if ($exists) {
-            return response()->json(['message' => 'Task already in favorites'], 422);
+            return response()->json(['message' => 'Already in favorites'], 422);
         }
 
-        $favorite = TaskFavorite::create([
+        $favorite = Favorite::create([
             'client_id' => $request->client_id,
             'task_id' => $request->task_id,
         ]);
 
-        $favorite->load('task:id,title,description,category,budget,budget_type,status,location');
+        $favorite->load('task');
 
         return response()->json($favorite->task, 201);
     }
 
-    // DELETE /api/task-favorites/{clientId}/{taskId}
+    // REMOVE favorite
     public function destroy(int $clientId, int $taskId): JsonResponse
     {
         $user = auth('api')->user();
@@ -71,7 +70,7 @@ class FavoriteController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        TaskFavorite::where('client_id', $clientId)
+        Favorite::where('client_id', $clientId)
             ->where('task_id', $taskId)
             ->delete();
 

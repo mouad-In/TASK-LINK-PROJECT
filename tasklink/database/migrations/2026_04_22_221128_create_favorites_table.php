@@ -6,24 +6,20 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-  public function up()
+    public function up(): void
     {
-        Schema::create('task_favorites', function (Blueprint $table) {
+        Schema::create('favorites', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('client_id');
-            $table->unsignedBigInteger('task_id');
+            $table->foreignId('client_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('task_id')->constrained('tasks')->cascadeOnDelete();
             $table->timestamps();
-            
-            $table->foreign('client_id')->references('id')->on('users')->onDelete('cascade');
-            $table->foreign('task_id')->references('id')->on('tasks')->onDelete('cascade');
+
             $table->unique(['client_id', 'task_id']);
         });
     }
 
-    public function down()
+    public function down(): void
     {
-        Schema::dropIfExists('task_favorites');
+        Schema::dropIfExists('favorites');
     }
-
-   
 };

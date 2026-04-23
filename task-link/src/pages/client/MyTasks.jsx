@@ -1,5 +1,5 @@
 // MyTasks.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/layouts/DashboardLayout';
@@ -52,6 +52,12 @@ const MyTasks = () => {
   const currentUser = useSelector((state) => state.auth.user);
   const { favoriteTasks = [] } = useSelector((state) => state.taskFavorites ?? {});
 
+  // ✅ تصفية المهام الفارغة أو الـ null
+  const validFavoriteTasks = useMemo(() => {
+    if (!favoriteTasks || !Array.isArray(favoriteTasks)) return [];
+    return favoriteTasks.filter(task => task && task.id);
+  }, [favoriteTasks]);
+
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('myTasksViewMode') || 'grid');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,9 +92,12 @@ const MyTasks = () => {
     localStorage.setItem('myTasksViewMode', viewMode);
   }, [viewMode]);
 
-  // Helpers
-  const isTaskFavorited = (taskId) =>
-    favoriteTasks.some((task) => task.id === taskId);
+  // ✅ دالة آمنة للتحقق من المفضلة
+  const isTaskFavorited = useCallback((taskId) => {
+    if (!taskId) return false;
+    if (!validFavoriteTasks.length) return false;
+    return validFavoriteTasks.some((task) => task.id === taskId);
+  }, [validFavoriteTasks]);
 
   const handleToggleFavorite = async (e, taskId) => {
     e.stopPropagation();
@@ -110,6 +119,7 @@ const MyTasks = () => {
         dispatch(addToast({ message: 'Task added to favorites ❤️', type: 'success' }));
       }
     } catch (error) {
+      console.error('Favorite error:', error);
       dispatch(addToast({ message: 'Failed to update favorites', type: 'error' }));
     } finally {
       setPendingFavIds((prev) => { const n = new Set(prev); n.delete(taskId); return n; });
@@ -171,7 +181,7 @@ const MyTasks = () => {
   return (
     <DashboardLayout userType="client">
       <div className="space-y-6">
-        {/* Header */}
+        {/* Header - نفس الكود */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">My Tasks</h1>
@@ -184,7 +194,7 @@ const MyTasks = () => {
           </Link>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - نفس الكود */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: 'Open', value: stats.open, icon: Clock3, bg: 'bg-primary/10', color: 'text-primary' },
@@ -208,7 +218,7 @@ const MyTasks = () => {
           ))}
         </div>
 
-        {/* Search & View Toggle */}
+        {/* Search & View Toggle - نفس الكود */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -231,7 +241,7 @@ const MyTasks = () => {
           </div>
         </div>
 
-        {/* Sort */}
+        {/* Sort - نفس الكود */}
         <div className="flex items-center justify-between">
           <div className="flex gap-2 flex-wrap">
             {[['newest','Newest'],['oldest','Oldest'],['budget_high','Highest Budget']].map(([val, label]) => (
@@ -243,7 +253,7 @@ const MyTasks = () => {
           {isLoading && tasks.length > 0 && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
         </div>
 
-        {/* Category Pills */}
+        {/* Category Pills - نفس الكود */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {CATEGORIES.map((cat) => (
             <button key={cat} onClick={() => setSelectedCategory(cat)}
@@ -256,7 +266,7 @@ const MyTasks = () => {
           ))}
         </div>
 
-        {/* Status Filter */}
+        {/* Status Filter - نفس الكود */}
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setStatusFilter('all')}
             className={cn('px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
@@ -285,6 +295,9 @@ const MyTasks = () => {
         {/* Task Cards */}
         <div className={cn(viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-3')}>
           {tasks.map((task) => {
+            // ✅ تأكد من وجود task قبل المحاولة
+            if (!task || !task.id) return null;
+            
             const statusConfig = STATUS_CONFIG[task.status];
             const StatusIcon = statusConfig?.icon || Clock3;
             const categoryColor = CATEGORY_COLORS[task.category] || 'bg-muted text-muted-foreground';
@@ -298,7 +311,7 @@ const MyTasks = () => {
               >
                 <CardContent className={cn('p-5', viewMode === 'list' && 'flex gap-6 items-center w-full')}>
                   <div className={cn('flex-1', viewMode === 'list' && 'min-w-0')}>
-                    {/* Top row */}
+                    {/* باقي الكود كما هو */}
                     <div className="flex items-start justify-between mb-3 gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge className={cn('text-xs border', categoryColor)}>{task.category}</Badge>
@@ -311,7 +324,6 @@ const MyTasks = () => {
                       </div>
 
                       <div className="flex items-center gap-1">
-                        {/* Favorite Button */}
                         <button
                           onClick={(e) => handleToggleFavorite(e, task.id)}
                           disabled={isPendingFav}
@@ -336,24 +348,20 @@ const MyTasks = () => {
                       </div>
                     </div>
 
-                    {/* Title */}
                     <h3 className="text-base font-semibold text-foreground mb-1.5 group-hover:text-primary transition-colors line-clamp-1">
                       {task.title}
                     </h3>
 
-                    {/* Description */}
                     <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                       {task.fullDescription || task.description}
                     </p>
 
-                    {/* Meta */}
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mb-4 flex-wrap">
                       <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{task.location || 'Location not specified'}</span>
                       <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{task.postedAt ? new Date(task.postedAt).toLocaleDateString() : 'Recently'}</span>
                       <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{task.applicationsCount || 0} proposals</span>
                     </div>
 
-                    {/* Footer */}
                     <div className="flex items-center justify-between pt-3 border-t border-border">
                       <div className="flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-muted-foreground" />
@@ -372,7 +380,7 @@ const MyTasks = () => {
           })}
         </div>
 
-        {/* Empty state */}
+        {/* Empty state - نفس الكود */}
         {tasks.length === 0 && !isLoading && (
           <div className="text-center py-16">
             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -392,7 +400,7 @@ const MyTasks = () => {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* Pagination - نفس الكود */}
         {pagination.lastPage > 1 && (
           <div className="flex items-center justify-center gap-2 pt-4">
             <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1}>Previous</Button>
