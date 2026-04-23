@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   ArrowLeft, MapPin, Calendar, Clock, Star,
   MessageSquare, Heart, Share2, Flag, Shield,
-  ChevronRight, Send, Briefcase, Eye
+  ChevronRight, Send, Briefcase, Eye, Loader2, XCircle, PlayCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -12,14 +12,20 @@ import { Badge } from '@/components/ui/Badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/Input';
+import {
+  Dialog, DialogContent, DialogHeader, DialogFooter,
+  DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 
 import {
   fetchTaskById,
   clearCurrentTask,
+  updateTask,
 } from '@/features/tasks/tasksSlice';
 
 import { createApplication, fetchApplicationsByWorker, fetchApplicationsByTask, updateApplicationStatus } from '@/features/applications/applicationsSlice';
 import { messageService } from '@/services/api';
+import TaskLocationMap from '@/pages/TaskLocationMap';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -36,6 +42,12 @@ const TaskDetails = () => {
   // Read real user from auth state
   const currentUser = useSelector((state) => state.auth.user);
   const isClient = currentUser?.role === 'client';
+  const isWorker = currentUser?.role === 'worker';
+
+  // ── Status-change action states ──
+  const [isStartingTask,  setIsStartingTask]  = useState(false);
+  const [isClosingTask,   setIsClosingTask]   = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   // ✅ استخرج قيم ثابتة خارج الـ useEffect لتجنب تغيير حجم الـ dependency array
   const currentUserId   = currentUser?.id   ?? null;
@@ -73,6 +85,33 @@ const TaskDetails = () => {
     }
     return () => dispatch(clearCurrentTask());
   }, [id, dispatch, currentUserId, currentUserRole]);
+
+  // ── Start Task handler (worker: assigned → in_progress) ──
+  const handleStartTask = async () => {
+    setIsStartingTask(true);
+    try {
+      await dispatch(updateTask({ taskId: parseInt(id, 10), taskData: { status: 'in_progress' } })).unwrap();
+      dispatch(fetchTaskById(id)); // refresh currentTask so badge updates
+    } catch (err) {
+      console.error('Failed to start task:', err);
+    } finally {
+      setIsStartingTask(false);
+    }
+  };
+
+  // ── Close Task handler (client: any → cancelled) ──
+  const handleCloseTask = async () => {
+    setIsClosingTask(true);
+    try {
+      await dispatch(updateTask({ taskId: parseInt(id, 10), taskData: { status: 'cancelled' } })).unwrap();
+      dispatch(fetchTaskById(id));
+    } catch (err) {
+      console.error('Failed to close task:', err);
+    } finally {
+      setIsClosingTask(false);
+      setShowCancelModal(false);
+    }
+  };
 
   // ── Submit proposal handler ──
   const handleSubmitProposal = async () => {
@@ -195,7 +234,7 @@ const TaskDetails = () => {
                     {task.category}
                   </Badge>
                   <Badge
-                    className={task.status === 'Open'
+                    className={task.status === 'open' || task.status === 'published'
                       ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
                       : 'bg-muted text-muted-foreground border-border'}
                     variant="outline"
@@ -256,14 +295,17 @@ const TaskDetails = () => {
                 <CardTitle className="text-foreground text-lg">Location</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="rounded-xl bg-muted h-48 flex items-center justify-center mb-4 border border-border">
-                  <div className="text-center text-muted-foreground">
-                    <MapPin className="w-8 h-8 mx-auto mb-2" />
-                    <p className="font-medium">{task.location}</p>
-                    {task.address && <p className="text-sm">{task.address}</p>}
-                  </div>
-                </div>
-                <p className="text-sm text-muted-foreground">Exact address will be shared after hiring.</p>
+                <TaskLocationMap
+                  latitude={task.latitude}
+                  longitude={task.longitude}
+                  location={task.location}
+                  address={task.address}
+                  height="220px"
+                  blurRadius={300}
+                />
+                <p className="text-sm text-muted-foreground mt-3">
+                  Exact address will be shared after hiring.
+                </p>
               </CardContent>
             </Card>
 
@@ -373,13 +415,57 @@ const TaskDetails = () => {
 
                 {isClient ? (
                   <div className="space-y-3">
-                    <Button className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground" size="lg">
-                      Edit Task
-                    </Button>
-                    <Button variant="outline" className="w-full" size="lg">
-                      Close Task
-                    </Button>
+                    {/* Edit — only when task is still open */}
+                    {(task.status === 'open' || task.status === 'published') && (
+                      <Button
+                        className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                        size="lg"
+                        onClick={() => navigate(`/client/tasks/${id}/edit`)}
+                      >
+                        Edit Task
+                      </Button>
+                    )}
+
+                    {/* Close / Cancel — not available once completed or already cancelled */}
+                    {task.status !== 'completed' && task.status !== 'cancelled' && (
+                      <Button
+                        variant="outline"
+                        className="w-full border-destructive/40 text-destructive hover:bg-destructive/10"
+                        size="lg"
+                        disabled={isClosingTask}
+                        onClick={() => setShowCancelModal(true)}
+                      >
+                        {isClosingTask
+                          ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cancelling…</>
+                          : <><XCircle className="w-4 h-4 mr-2" />Cancel Task</>
+                        }
+                      </Button>
+                    )}
+
+                    {/* Cancelled / Completed label */}
+                    {(task.status === 'cancelled' || task.status === 'completed') && (
+                      <div className={`text-center py-3 rounded-lg text-sm font-medium ${
+                        task.status === 'cancelled'
+                          ? 'bg-destructive/10 text-destructive'
+                          : 'bg-emerald-500/10 text-emerald-600'
+                      }`}>
+                        {task.status === 'cancelled' ? '✗ Task Cancelled' : '✓ Task Completed'}
+                      </div>
+                    )}
                   </div>
+                ) : isWorker && task.status === 'assigned' ? (
+                  // ── Worker: assigned → in_progress button ──
+                  <Button
+                    className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                    size="lg"
+                    disabled={isStartingTask}
+                    onClick={handleStartTask}
+                  >
+                    {isStartingTask
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Starting…</>
+                      : <><PlayCircle className="w-4 h-4 mr-2" />Start Task</>
+                    }
+                  </Button>
                 ) : showApplyForm ? (
                   <div className="space-y-4">
                     <div>
@@ -524,6 +610,44 @@ const TaskDetails = () => {
           </div>
         </div>
       </main>
+
+      {/* ── Cancel Task Confirmation Modal ── */}
+      <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10 mx-auto mb-2">
+              <XCircle className="w-6 h-6 text-destructive" />
+            </div>
+            <DialogTitle className="text-center text-foreground">Cancel Task</DialogTitle>
+            <DialogDescription className="text-center">
+              Are you sure you want to cancel{' '}
+              <span className="font-medium text-foreground">"{task?.title}"</span>?
+              <br />
+              <span className="text-destructive/80">Workers will no longer be able to apply.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-3 sm:justify-center mt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowCancelModal(false)}
+            >
+              Keep Task
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              disabled={isClosingTask}
+              onClick={handleCloseTask}
+            >
+              {isClosingTask
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Cancelling…</>
+                : <><XCircle className="w-4 h-4 mr-2" />Yes, Cancel Task</>
+              }
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

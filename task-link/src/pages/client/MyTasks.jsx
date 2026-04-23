@@ -8,16 +8,17 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent } from '@/components/ui/Card';
 import {
+  Dialog, DialogContent, DialogHeader, DialogFooter,
+  DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
+import {
   Search,
   MapPin,
-  Star,
   Clock,
   DollarSign,
   Grid3X3,
   List,
-  Filter,
   SlidersHorizontal,
-  ArrowUpDown,
   Plus,
   MoreVertical,
   CheckCircle,
@@ -34,25 +35,20 @@ import {
 } from 'lucide-react';
 import { cn } from '@/components/lib/utils';
 
-// Redux actions from existing tasksSlice
-import { 
-  fetchTasks, 
-  updateTask, 
-  deleteTask,
-  clearError 
-} from '@/features/tasks/tasksSlice';
+import { fetchTasks, updateTask, deleteTask, clearError } from '@/features/tasks/tasksSlice';
 import { addToast } from '@/features/notifications/notificationsSlice';
-import { fetchFavoriteTasks, addToFavorites, removeFromFavorites } from '@/features/favorite/favoritesSlice';
+import { addToFavorites, removeFromFavorites } from '@/features/favorite/favoritesSlice';
 
 const CATEGORIES = ['All', 'Cleaning', 'Repairs', 'Moving', 'IT Help', 'Gardening', 'Photography'];
 
 const STATUS_CONFIG = {
-  open: { label: 'Open', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
-  in_progress: { label: 'In Progress', color: 'bg-primary/20 text-primary border-primary/30', icon: Clock3 },
-  assigned: { label: 'Assigned', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: Users },
-  completed: { label: 'Completed', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: CheckCircle },
-  pending_approval: { label: 'Pending Approval', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30', icon: Clock3 },
-  cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: XCircle },
+  published:        { label: 'Open',            color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
+  open:             { label: 'Open',            color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
+  in_progress:      { label: 'In Progress',     color: 'bg-primary/20 text-primary border-primary/30',            icon: Clock3 },
+  assigned:         { label: 'Assigned',        color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',         icon: Users },
+  completed:        { label: 'Completed',       color: 'bg-green-500/20 text-green-400 border-green-500/30',      icon: CheckCircle },
+  pending_approval: { label: 'Pending Approval',color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',     icon: Clock3 },
+  cancelled:        { label: 'Cancelled',       color: 'bg-red-500/20 text-red-400 border-red-500/30',           icon: XCircle },
 };
 
 const CATEGORY_COLORS = {
@@ -69,9 +65,14 @@ const MyTasks = () => {
   const navigate = useNavigate();
   
   // Redux state selectors
-  const { tasks, isLoading, error, pagination } = useSelector((state) => state.tasks);
-  const { profile } = useSelector((state) => state.client);
-  
+  const tasks        = useSelector((state) => state.tasks.tasks);
+  const isLoading    = useSelector((state) => state.tasks.isLoading);
+  const error        = useSelector((state) => state.tasks.error);
+  const pagination   = useSelector((state) => state.tasks.pagination);
+  const currentUser  = useSelector((state) => state.auth.user);
+  const favoritesRaw = useSelector((state) => state.taskFavorites.favorites);
+  const favoriteIds  = new Set((favoritesRaw || []).map((f) => String(f.id)));
+
   // Local state
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('myTasksViewMode') || 'grid';
@@ -79,15 +80,18 @@ const MyTasks = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [favPendingIds, setFavPendingIds] = useState(new Set());
+  const [completePendingIds, setCompletePendingIds] = useState(new Set());
+  const [deleteModal, setDeleteModal] = useState({ open: false, taskId: null, taskTitle: '' });
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
   
   // Fetch tasks on component mount and when filters change
   useEffect(() => {
-    if (profile?.id) {
+    if (currentUser?.id) {
       const filters = {
-        client_id: profile.id,
+        client_id: currentUser.id,
         page: currentPage,
         per_page: 12,
         ...(selectedCategory !== 'All' && { category: selectedCategory }),
@@ -97,7 +101,7 @@ const MyTasks = () => {
       };
       dispatch(fetchTasks(filters));
     }
-  }, [dispatch, profile?.id, currentPage, selectedCategory, statusFilter, searchQuery, sortBy]);
+  }, [dispatch, currentUser?.id, currentPage, selectedCategory, statusFilter, searchQuery, sortBy]);
   
   // Save view mode preference
   useEffect(() => {
@@ -113,21 +117,19 @@ const MyTasks = () => {
     navigate(`/client/tasks/${taskId}/edit`);
   };
   
-  const handleDeleteTask = async (taskId, e) => {
+  const handleDeleteTask = (taskId, e, taskTitle = '') => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      try {
-        await dispatch(deleteTask(taskId)).unwrap();
-        dispatch(addToast({
-          message: 'Task deleted successfully',
-          type: 'success'
-        }));
-      } catch (err) {
-        dispatch(addToast({
-          message: 'Failed to delete task',
-          type: 'error'
-        }));
-      }
+    setDeleteModal({ open: true, taskId, taskTitle });
+  };
+
+  const confirmDelete = async () => {
+    const { taskId } = deleteModal;
+    setDeleteModal((m) => ({ ...m, open: false }));
+    try {
+      await dispatch(deleteTask(taskId)).unwrap();
+      dispatch(addToast({ message: 'Task deleted successfully', type: 'success' }));
+    } catch {
+      dispatch(addToast({ message: 'Failed to delete task', type: 'error' }));
     }
   };
   
@@ -140,11 +142,45 @@ const MyTasks = () => {
     e.stopPropagation();
     navigate('/client/messages', { state: { recipientId: workerId } });
   };
+
+  const handleMarkComplete = async (taskId, e) => {
+    e.stopPropagation();
+    if (completePendingIds.has(taskId)) return;
+    setCompletePendingIds((prev) => new Set(prev).add(taskId));
+    try {
+      await dispatch(updateTask({ taskId, taskData: { status: 'completed' } })).unwrap();
+      dispatch(addToast({ message: 'Task marked as completed!', type: 'success' }));
+    } catch {
+      dispatch(addToast({ message: 'Failed to mark task as completed', type: 'error' }));
+    } finally {
+      setCompletePendingIds((prev) => { const n = new Set(prev); n.delete(taskId); return n; });
+    }
+  };
+
+  const handleToggleFavorite = async (e, taskId) => {
+    e.stopPropagation();
+    if (!currentUser?.id || favPendingIds.has(taskId)) return;
+    setFavPendingIds((prev) => new Set(prev).add(taskId));
+    const isFav = favoriteIds.has(String(taskId));
+    try {
+      if (isFav) {
+        await dispatch(removeFromFavorites({ clientId: currentUser.id, taskId })).unwrap();
+        dispatch(addToast({ message: 'Removed from favorites', type: 'success' }));
+      } else {
+        await dispatch(addToFavorites({ clientId: currentUser.id, taskId })).unwrap();
+        dispatch(addToast({ message: 'Added to favorites', type: 'success' }));
+      }
+    } catch {
+      dispatch(addToast({ message: 'Failed to update favorites', type: 'error' }));
+    } finally {
+      setFavPendingIds((prev) => { const n = new Set(prev); n.delete(taskId); return n; });
+    }
+  };
   
   const handleRetry = () => {
     dispatch(clearError());
     const filters = {
-      client_id: profile?.id,
+      client_id: currentUser?.id,
       page: currentPage,
       per_page: 12,
       ...(selectedCategory !== 'All' && { category: selectedCategory }),
@@ -170,12 +206,13 @@ const MyTasks = () => {
     return `$${task.budget}/hr`;
   };
   
-  // Calculate stats
+  const isOpen = (t) => t.status === 'open' || t.status === 'published';
+
   const stats = {
-    open: tasks.filter(t => t.status === 'open').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress' || t.status === 'assigned').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    total_proposals: tasks.reduce((acc, t) => acc + (t.applicationsCount || 0), 0),
+    open:             tasks.filter(isOpen).length,
+    in_progress:      tasks.filter(t => t.status === 'in_progress' || t.status === 'assigned').length,
+    completed:        tasks.filter(t => t.status === 'completed').length,
+    total_proposals:  tasks.reduce((acc, t) => acc + (t.applicationsCount || 0), 0),
   };
   
   // Loading state
@@ -460,9 +497,24 @@ const MyTasks = () => {
                         </button>
                         <button
                           className="text-muted-foreground hover:text-destructive transition-colors shrink-0 p-1"
-                          onClick={(e) => handleDeleteTask(task.id, e)}
+                          onClick={(e) => handleDeleteTask(task.id, e, task.title)}
                         >
                           <Trash2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          disabled={favPendingIds.has(task.id)}
+                          className={cn(
+                            'transition-colors shrink-0 p-1 disabled:opacity-50',
+                            favoriteIds.has(String(task.id))
+                              ? 'text-rose-500 hover:text-rose-400'
+                              : 'text-muted-foreground hover:text-rose-500'
+                          )}
+                          onClick={(e) => handleToggleFavorite(e, task.id)}
+                        >
+                          {favPendingIds.has(task.id)
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <Heart className={cn('w-4 h-4', favoriteIds.has(String(task.id)) && 'fill-rose-500')} />
+                          }
                         </button>
                         <button
                           className="text-muted-foreground hover:text-foreground transition-colors shrink-0 p-1"
@@ -499,7 +551,7 @@ const MyTasks = () => {
                           {task.assigned_worker.name}
                         </span>
                       )}
-                      {!task.assigned_worker && task.status === 'open' && (
+                      {!task.assigned_worker && isOpen(task) && (
                         <span className="flex items-center gap-1">
                           <Users className="w-3.5 h-3.5" />
                           {task.applicationsCount || 0} proposals
@@ -528,7 +580,22 @@ const MyTasks = () => {
                           <Eye className="w-3.5 h-3.5" />
                           View
                         </Button>
-                        {task.status === 'open' && task.applicationsCount > 0 && (
+                        {(task.status === 'in_progress' || task.status === 'assigned') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                            disabled={completePendingIds.has(task.id)}
+                            onClick={(e) => handleMarkComplete(task.id, e)}
+                          >
+                            {completePendingIds.has(task.id)
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <CheckCircle className="w-3.5 h-3.5" />
+                            }
+                            Complete
+                          </Button>
+                        )}
+                        {isOpen(task) && task.applicationsCount > 0 && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -612,6 +679,44 @@ const MyTasks = () => {
           </div>
         )}
       </div>
+
+      {/* ── Delete Confirmation Modal ── */}
+      <Dialog open={deleteModal.open} onOpenChange={(open) => setDeleteModal((m) => ({ ...m, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10 mx-auto mb-2">
+              <Trash2 className="w-6 h-6 text-destructive" />
+            </div>
+            <DialogTitle className="text-center text-foreground">Delete Task</DialogTitle>
+            <DialogDescription className="text-center">
+              Are you sure you want to delete{' '}
+              {deleteModal.taskTitle
+                ? <span className="font-medium text-foreground">"{deleteModal.taskTitle}"</span>
+                : 'this task'
+              }?
+              <br />
+              <span className="text-destructive/80">This action cannot be undone.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-3 sm:justify-center mt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setDeleteModal({ open: false, taskId: null, taskTitle: '' })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              onClick={confirmDelete}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

@@ -64,7 +64,11 @@ export const fetchTasks = createAsyncThunk(
   'tasks/fetchTasks',
   async (params = {}, { rejectWithValue }) => {
     try {
-      return await taskService.getAllTasks(params);
+      const { client_id, ...rest } = params;
+      if (client_id) {
+        return await taskService.getTasksByClient(client_id);
+      }
+      return await taskService.getAllTasks(rest);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }

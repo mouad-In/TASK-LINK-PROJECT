@@ -19,8 +19,8 @@ import { addToast } from '@/features/notifications/notificationsSlice';
 const CATEGORIES = ['All', 'Cleaning', 'Repairs', 'Moving', 'IT Help', 'Gardening', 'Photography'];
 
 const STATUS_CONFIG = {
+  published:        { label: 'Open',             color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
   open:             { label: 'Open',             color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
-  published:        { label: 'Published',        color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
   in_progress:      { label: 'In Progress',      color: 'bg-primary/20 text-primary border-primary/30',            icon: Clock3 },
   assigned:         { label: 'Assigned',         color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',         icon: Users },
   completed:        { label: 'Completed',        color: 'bg-green-500/20 text-green-400 border-green-500/30',      icon: CheckCircle },
@@ -41,7 +41,9 @@ const Favorites = () => {
   const dispatch  = useDispatch();
   const navigate  = useNavigate();
 
-  const { favorites = [], isLoading, error } = useSelector((state) => state.favorites ?? {});
+  const favorites  = useSelector((state) => state.taskFavorites.favorites);
+  const isLoading  = useSelector((state) => state.taskFavorites.isLoading);
+  const error      = useSelector((state) => state.taskFavorites.error);
   const currentUser = useSelector((state) => state.auth.user);
 
   const [viewMode,         setViewMode]         = useState(() => localStorage.getItem('favViewMode') || 'grid');
