@@ -2,14 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
-import  DashboardLayout  from '@/layouts/DashboardLayout';
+import DashboardLayout from '@/layouts/DashboardLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardContent } from '@/components/ui/Card';
 import {
   Search, MapPin, Clock, DollarSign, Grid3X3, List,
-  SlidersHorizontal, Plus, MoreVertical, CheckCircle,
+  Plus, MoreVertical, CheckCircle,
   XCircle, Clock3, MessageSquare, Eye, Edit, Trash2,
   Users, Loader2, AlertCircle, Heart,
 } from 'lucide-react';
@@ -18,7 +18,7 @@ import { cn } from '@/components/lib/utils';
 import { fetchTasks, deleteTask, clearError } from '@/features/tasks/tasksSlice';
 import { addToast } from '@/features/notifications/notificationsSlice';
 import {
-  fetchFavoriteWorkers,
+  fetchFavoriteTasks,
   addToFavorites,
   removeFromFavorites,
 } from '@/features/favorite/favoritesSlice';
@@ -26,21 +26,21 @@ import {
 const CATEGORIES = ['All', 'Cleaning', 'Repairs', 'Moving', 'IT Help', 'Gardening', 'Photography'];
 
 const STATUS_CONFIG = {
-  open:             { label: 'Open',             color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
-  in_progress:      { label: 'In Progress',      color: 'bg-primary/20 text-primary border-primary/30',            icon: Clock3 },
-  assigned:         { label: 'Assigned',         color: 'bg-blue-500/20 text-blue-400 border-blue-500/30',         icon: Users },
-  completed:        { label: 'Completed',        color: 'bg-green-500/20 text-green-400 border-green-500/30',      icon: CheckCircle },
-  pending_approval: { label: 'Pending Approval', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',      icon: Clock3 },
-  cancelled:        { label: 'Cancelled',        color: 'bg-red-500/20 text-red-400 border-red-500/30',            icon: XCircle },
-  published:        { label: 'Published',        color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
+  open: { label: 'Open', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
+  in_progress: { label: 'In Progress', color: 'bg-primary/20 text-primary border-primary/30', icon: Clock3 },
+  assigned: { label: 'Assigned', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: Users },
+  completed: { label: 'Completed', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: CheckCircle },
+  pending_approval: { label: 'Pending Approval', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30', icon: Clock3 },
+  cancelled: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: XCircle },
+  published: { label: 'Published', color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30', icon: Clock3 },
 };
 
 const CATEGORY_COLORS = {
-  Cleaning:    'bg-pink-500/20 text-pink-400 border-pink-500/30',
-  Repairs:     'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  Moving:      'bg-primary/20 text-primary border-primary/30',
-  'IT Help':   'bg-secondary/20 text-secondary border-secondary/30',
-  Gardening:   'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  Cleaning: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
+  Repairs: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  Moving: 'bg-primary/20 text-primary border-primary/30',
+  'IT Help': 'bg-secondary/20 text-secondary border-secondary/30',
+  Gardening: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   Photography: 'bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30',
 };
 
@@ -50,17 +50,17 @@ const MyTasks = () => {
 
   const { tasks, isLoading, error, pagination } = useSelector((state) => state.tasks);
   const currentUser = useSelector((state) => state.auth.user);
-  const { favorites = [] } = useSelector((state) => state.favorites ?? {});
+  const { favoriteTasks = [] } = useSelector((state) => state.taskFavorites ?? {});
 
-  const [viewMode,          setViewMode]          = useState(() => localStorage.getItem('myTasksViewMode') || 'grid');
-  const [selectedCategory,  setSelectedCategory]  = useState('All');
-  const [searchQuery,       setSearchQuery]        = useState('');
-  const [statusFilter,      setStatusFilter]       = useState('all');
-  const [currentPage,       setCurrentPage]        = useState(1);
-  const [sortBy,            setSortBy]             = useState('newest');
-  const [pendingFavIds,     setPendingFavIds]       = useState(new Set());
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('myTasksViewMode') || 'grid');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('newest');
+  const [pendingFavIds, setPendingFavIds] = useState(new Set());
 
-  // ── جلب المهام ────────────────────────────────────────────────────────────
+  // Fetch tasks
   useEffect(() => {
     if (currentUser?.id) {
       dispatch(fetchTasks({
@@ -68,17 +68,17 @@ const MyTasks = () => {
         page: currentPage,
         per_page: 12,
         ...(selectedCategory !== 'All' && { category: selectedCategory }),
-        ...(statusFilter !== 'all'     && { status: statusFilter }),
-        ...(searchQuery                && { search: searchQuery }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(searchQuery && { search: searchQuery }),
         sort: sortBy,
       }));
     }
   }, [dispatch, currentUser?.id, currentPage, selectedCategory, statusFilter, searchQuery, sortBy]);
 
-  // ── جلب المفضلة ───────────────────────────────────────────────────────────
+  // Fetch favorite tasks
   useEffect(() => {
     if (currentUser?.id) {
-      dispatch(fetchFavoriteWorkers(currentUser.id));
+      dispatch(fetchFavoriteTasks(currentUser.id));
     }
   }, [dispatch, currentUser?.id]);
 
@@ -86,31 +86,39 @@ const MyTasks = () => {
     localStorage.setItem('myTasksViewMode', viewMode);
   }, [viewMode]);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const isWorkerFavorited = (workerId) =>
-    favorites.some((f) => String(f.id ?? f.worker_id) === String(workerId));
+  // Helpers
+  const isTaskFavorited = (taskId) =>
+    favoriteTasks.some((task) => task.id === taskId);
 
-  const handleToggleFavoriteWorker = async (e, workerId) => {
+  const handleToggleFavorite = async (e, taskId) => {
     e.stopPropagation();
-    if (!workerId || pendingFavIds.has(workerId)) return;
+    if (!taskId || pendingFavIds.has(taskId)) return;
 
-    setPendingFavIds((prev) => new Set(prev).add(workerId));
+    setPendingFavIds((prev) => new Set(prev).add(taskId));
     try {
-      if (isWorkerFavorited(workerId)) {
-        await dispatch(removeFromFavorites({ clientId: currentUser.id, workerId }));
-        dispatch(addToast({ message: 'Removed from favorites', type: 'info' }));
+      if (isTaskFavorited(taskId)) {
+        await dispatch(removeFromFavorites({ 
+          clientId: currentUser.id, 
+          taskId 
+        })).unwrap();
+        dispatch(addToast({ message: 'Task removed from favorites', type: 'info' }));
       } else {
-        await dispatch(addToFavorites({ clientId: currentUser.id, workerId }));
-        dispatch(addToast({ message: 'Worker added to favorites ❤️', type: 'success' }));
+        await dispatch(addToFavorites({ 
+          clientId: currentUser.id, 
+          taskId 
+        })).unwrap();
+        dispatch(addToast({ message: 'Task added to favorites ❤️', type: 'success' }));
       }
+    } catch (error) {
+      dispatch(addToast({ message: 'Failed to update favorites', type: 'error' }));
     } finally {
-      setPendingFavIds((prev) => { const n = new Set(prev); n.delete(workerId); return n; });
+      setPendingFavIds((prev) => { const n = new Set(prev); n.delete(taskId); return n; });
     }
   };
 
-  const handleViewTask    = (taskId)    => navigate(`/client/tasks/${taskId}`);
-  const handleEditTask    = (taskId, e) => { e.stopPropagation(); navigate(`/client/tasks/${taskId}/edit`); };
-  const handleDeleteTask  = async (taskId, e) => {
+  const handleViewTask = (taskId) => navigate(`/client/tasks/${taskId}`);
+  const handleEditTask = (taskId, e) => { e.stopPropagation(); navigate(`/client/tasks/${taskId}/edit`); };
+  const handleDeleteTask = async (taskId, e) => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to delete this task?')) return;
     try {
@@ -120,10 +128,7 @@ const MyTasks = () => {
       dispatch(addToast({ message: 'Failed to delete task', type: 'error' }));
     }
   };
-  const handleMessageWorker = (workerId, e) => {
-    e.stopPropagation();
-    navigate('/client/messages', { state: { recipientId: workerId } });
-  };
+  
   const handleRetry = () => {
     dispatch(clearError());
     dispatch(fetchTasks({ client_id: currentUser?.id, page: currentPage, per_page: 12 }));
@@ -133,13 +138,13 @@ const MyTasks = () => {
     task.budget_type === 'Fixed Price' ? `$${task.budget}` : `$${task.budget}/hr`;
 
   const stats = {
-    open:            tasks.filter((t) => t.status === 'open' || t.status === 'published').length,
-    in_progress:     tasks.filter((t) => t.status === 'in_progress' || t.status === 'assigned').length,
-    completed:       tasks.filter((t) => t.status === 'completed').length,
+    open: tasks.filter((t) => t.status === 'open' || t.status === 'published').length,
+    in_progress: tasks.filter((t) => t.status === 'in_progress' || t.status === 'assigned').length,
+    completed: tasks.filter((t) => t.status === 'completed').length,
     total_proposals: tasks.reduce((acc, t) => acc + (t.applicationsCount || 0), 0),
   };
 
-  // ── States ────────────────────────────────────────────────────────────────
+  // Loading and error states
   if (isLoading && tasks.length === 0) return (
     <DashboardLayout userType="client">
       <div className="flex items-center justify-center min-h-[400px]">
@@ -163,11 +168,9 @@ const MyTasks = () => {
     </DashboardLayout>
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout userType="client">
       <div className="space-y-6">
-
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -181,13 +184,13 @@ const MyTasks = () => {
           </Link>
         </div>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: 'Open',            value: stats.open,            icon: Clock3,     bg: 'bg-primary/10',     color: 'text-primary' },
-            { label: 'In Progress',     value: stats.in_progress,     icon: Clock,      bg: 'bg-amber-500/10',   color: 'text-amber-500' },
-            { label: 'Completed',       value: stats.completed,       icon: CheckCircle,bg: 'bg-green-500/10',   color: 'text-green-500' },
-            { label: 'Total Proposals', value: stats.total_proposals, icon: Users,      bg: 'bg-emerald-500/10', color: 'text-emerald-500' },
+            { label: 'Open', value: stats.open, icon: Clock3, bg: 'bg-primary/10', color: 'text-primary' },
+            { label: 'In Progress', value: stats.in_progress, icon: Clock, bg: 'bg-amber-500/10', color: 'text-amber-500' },
+            { label: 'Completed', value: stats.completed, icon: CheckCircle, bg: 'bg-green-500/10', color: 'text-green-500' },
+            { label: 'Total Proposals', value: stats.total_proposals, icon: Users, bg: 'bg-emerald-500/10', color: 'text-emerald-500' },
           ].map(({ label, value, icon: Icon, bg, color }) => (
             <Card key={label} className="border-border">
               <CardContent className="p-4">
@@ -282,12 +285,11 @@ const MyTasks = () => {
         {/* Task Cards */}
         <div className={cn(viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-3')}>
           {tasks.map((task) => {
-            const statusConfig  = STATUS_CONFIG[task.status];
-            const StatusIcon    = statusConfig?.icon || Clock3;
+            const statusConfig = STATUS_CONFIG[task.status];
+            const StatusIcon = statusConfig?.icon || Clock3;
             const categoryColor = CATEGORY_COLORS[task.category] || 'bg-muted text-muted-foreground';
-            const workerId      = task.worker?.id ?? task.worker_id ?? null;
-            const isFav         = workerId ? isWorkerFavorited(workerId) : false;
-            const isPendingFav  = workerId ? pendingFavIds.has(workerId) : false;
+            const isFav = isTaskFavorited(task.id);
+            const isPendingFav = pendingFavIds.has(task.id);
 
             return (
               <Card key={task.id}
@@ -296,7 +298,6 @@ const MyTasks = () => {
               >
                 <CardContent className={cn('p-5', viewMode === 'list' && 'flex gap-6 items-center w-full')}>
                   <div className={cn('flex-1', viewMode === 'list' && 'min-w-0')}>
-
                     {/* Top row */}
                     <div className="flex items-start justify-between mb-3 gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -310,21 +311,19 @@ const MyTasks = () => {
                       </div>
 
                       <div className="flex items-center gap-1">
-                        {/* ❤️ Favorite Worker Button */}
-                        {workerId && (
-                          <button
-                            onClick={(e) => handleToggleFavoriteWorker(e, workerId)}
-                            disabled={isPendingFav}
-                            title={isFav ? 'Remove worker from favorites' : 'Add worker to favorites'}
-                            className={cn(
-                              'p-1 rounded transition-all',
-                              isPendingFav ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110',
-                              isFav ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
-                            )}
-                          >
-                            <Heart className={cn('w-4 h-4 transition-all', isFav && 'fill-red-500')} />
-                          </button>
-                        )}
+                        {/* Favorite Button */}
+                        <button
+                          onClick={(e) => handleToggleFavorite(e, task.id)}
+                          disabled={isPendingFav}
+                          title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                          className={cn(
+                            'p-1 rounded transition-all',
+                            isPendingFav ? 'opacity-50 cursor-not-allowed' : 'hover:scale-110',
+                            isFav ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
+                          )}
+                        >
+                          <Heart className={cn('w-4 h-4 transition-all', isFav && 'fill-red-500')} />
+                        </button>
                         <button className="text-muted-foreground hover:text-foreground transition-colors shrink-0 p-1" onClick={(e) => handleEditTask(task.id, e)}>
                           <Edit className="w-4 h-4" />
                         </button>
@@ -351,15 +350,7 @@ const MyTasks = () => {
                     <div className="flex items-center gap-3 text-xs text-muted-foreground mb-4 flex-wrap">
                       <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{task.location || 'Location not specified'}</span>
                       <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" />{task.postedAt ? new Date(task.postedAt).toLocaleDateString() : 'Recently'}</span>
-                      {workerId ? (
-                        <span className="flex items-center gap-1 text-primary">
-                          <Users className="w-3.5 h-3.5" />
-                          {task.worker?.first_name} {task.worker?.last_name}
-                          {isFav && <Heart className="w-3 h-3 fill-red-500 text-red-500 ml-1" />}
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{task.applicationsCount || 0} proposals</span>
-                      )}
+                      <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5" />{task.applicationsCount || 0} proposals</span>
                     </div>
 
                     {/* Footer */}
@@ -372,11 +363,6 @@ const MyTasks = () => {
                         <Button variant="ghost" size="sm" className="gap-1" onClick={(e) => { e.stopPropagation(); handleViewTask(task.id); }}>
                           <Eye className="w-3.5 h-3.5" /> View
                         </Button>
-                        {(task.status === 'in_progress' || task.status === 'assigned') && workerId && (
-                          <Button variant="ghost" size="sm" className="gap-1" onClick={(e) => handleMessageWorker(workerId, e)}>
-                            <MessageSquare className="w-3.5 h-3.5" /> Chat
-                          </Button>
-                        )}
                       </div>
                     </div>
                   </div>
@@ -414,7 +400,6 @@ const MyTasks = () => {
             <Button variant="outline" size="sm" onClick={() => setCurrentPage((p) => Math.min(pagination.lastPage, p + 1))} disabled={currentPage === pagination.lastPage}>Next</Button>
           </div>
         )}
-
       </div>
     </DashboardLayout>
   );

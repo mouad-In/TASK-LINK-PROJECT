@@ -80,7 +80,7 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/saved-tasks/{task}',   [SavedTaskController::class, 'destroy']);
 
     // Favorites (client saves workers)
-    Route::get('/favorites/{clientId}',              [FavoriteController::class, 'index']);
-    Route::post('/favorites',                        [FavoriteController::class, 'store']);
-    Route::delete('/favorites/{clientId}/{workerId}',[FavoriteController::class, 'destroy']);
+    Route::get('/task-favorites/{clientId}', [FavoriteController::class, 'index']);
+    Route::post('/task-favorites', [FavoriteController::class, 'store']);
+    Route::delete('/task-favorites/{clientId}/{taskId}', [FavoriteController::class, 'destroy']);
 });

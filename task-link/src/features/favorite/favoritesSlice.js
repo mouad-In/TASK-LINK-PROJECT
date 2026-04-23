@@ -1,18 +1,18 @@
-// store/client/favoritesSlice.js
+// store/client/taskFavoritesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import  {favoritesService } from '@/services/api';
+import { taskFavoritesService } from '@/services/api';
 
 const initialState = {
-  favorites: [],
+  favoriteTasks: [],
   isLoading: false,
   error: null,
 };
 
-export const fetchFavoriteWorkers = createAsyncThunk(
-  'favorites/fetchFavoriteWorkers',
+export const fetchFavoriteTasks = createAsyncThunk(
+  'taskFavorites/fetchFavoriteTasks',
   async (clientId, { rejectWithValue }) => {
     try {
-      return await favoritesService.getFavorites(clientId);
+      return await taskFavoritesService.getFavoriteTasks(clientId);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -20,10 +20,10 @@ export const fetchFavoriteWorkers = createAsyncThunk(
 );
 
 export const addToFavorites = createAsyncThunk(
-  'favorites/addToFavorites',
-  async ({ clientId, workerId }, { rejectWithValue }) => {
+  'taskFavorites/addToFavorites',
+  async ({ clientId, taskId }, { rejectWithValue }) => {
     try {
-      return await favoritesService.addFavorite(clientId, workerId);
+      return await taskFavoritesService.addFavoriteTask(clientId, taskId);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -31,11 +31,11 @@ export const addToFavorites = createAsyncThunk(
 );
 
 export const removeFromFavorites = createAsyncThunk(
-  'favorites/removeFromFavorites',
-  async ({ clientId, workerId }, { rejectWithValue }) => {
+  'taskFavorites/removeFromFavorites',
+  async ({ clientId, taskId }, { rejectWithValue }) => {
     try {
-      await favoritesService.removeFavorite(clientId, workerId);
-      return workerId;
+      await taskFavoritesService.removeFavoriteTask(clientId, taskId);
+      return taskId;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -43,42 +43,40 @@ export const removeFromFavorites = createAsyncThunk(
 );
 
 const favoritesSlice = createSlice({
-  name: 'favorites',
+  name: 'taskFavorites',
   initialState,
   reducers: {
-    clearFavoritesError: (state) => {
+    clearError: (state) => {
       state.error = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch Favorites
-      .addCase(fetchFavoriteWorkers.pending, (state) => {
+      // Fetch favorites
+      .addCase(fetchFavoriteTasks.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchFavoriteWorkers.fulfilled, (state, action) => {
+      .addCase(fetchFavoriteTasks.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.favorites = action.payload;
+        state.favoriteTasks = action.payload;
       })
-      .addCase(fetchFavoriteWorkers.rejected, (state, action) => {
+      .addCase(fetchFavoriteTasks.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       })
-      // Add to Favorites
+      // Add to favorites
       .addCase(addToFavorites.fulfilled, (state, action) => {
-        if (!state.favorites) state.favorites = [];
-        if (action.payload) state.favorites.unshift(action.payload);
+        state.favoriteTasks.push(action.payload);
       })
-      // Remove from Favorites
+      // Remove from favorites
       .addCase(removeFromFavorites.fulfilled, (state, action) => {
-        if (!state.favorites) return;
-        state.favorites = state.favorites.filter(
-          (w) => String(w.id ?? w.worker_id) !== String(action.payload)
+        state.favoriteTasks = state.favoriteTasks.filter(
+          (task) => task.id !== action.payload
         );
       });
   },
 });
 
-export const { clearFavoritesError } = favoritesSlice.actions;
+export const { clearError } = favoritesSlice.actions;
 export default favoritesSlice.reducer;
