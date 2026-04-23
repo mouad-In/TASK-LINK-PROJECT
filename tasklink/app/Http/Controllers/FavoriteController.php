@@ -13,7 +13,7 @@ class FavoriteController extends Controller
         $this->middleware('auth:api');
     }
 
-    // GET favorites of user
+    // GET /api/favorites/{clientId}
     public function index(int $clientId): JsonResponse
     {
         $user = auth('api')->user();
@@ -23,18 +23,23 @@ class FavoriteController extends Controller
         }
 
         $favorites = Favorite::where('client_id', $clientId)
-            ->with('task:id,title,description,category,budget,status,location,created_at')->get()
-            ->map(fn($fav) => $fav->task);
+            ->with('task:id,title,description,category,budget,status,location,urgency,created_at')
+            ->get()
+            ->filter(fn($fav) => $fav->task !== null)  // تخطي المهام المحذوفة
+            ->map(fn($fav) => array_merge($fav->task->toArray(), [
+                'budget' => (float) $fav->task->budget,
+            ]))
+            ->values();
 
         return response()->json($favorites);
     }
 
-    // ADD favorite
+    // POST /api/favorites
     public function store(Request $request): JsonResponse
     {
         $request->validate([
             'client_id' => 'required|exists:users,id',
-            'task_id' => 'required|exists:tasks,id',
+            'task_id'   => 'required|exists:tasks,id',
         ]);
 
         $user = auth('api')->user();
@@ -53,15 +58,17 @@ class FavoriteController extends Controller
 
         $favorite = Favorite::create([
             'client_id' => $request->client_id,
-            'task_id' => $request->task_id,
+            'task_id'   => $request->task_id,
         ]);
 
         $favorite->load('task');
 
-        return response()->json($favorite->task, 201);
+        return response()->json(array_merge($favorite->task->toArray(), [
+            'budget' => (float) $favorite->task->budget,
+        ]), 201);
     }
 
-    // REMOVE favorite
+    // DELETE /api/favorites/{clientId}/{taskId}
     public function destroy(int $clientId, int $taskId): JsonResponse
     {
         $user = auth('api')->user();

@@ -79,8 +79,8 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/saved-tasks',            [SavedTaskController::class, 'store']);
     Route::delete('/saved-tasks/{task}',   [SavedTaskController::class, 'destroy']);
 
-    // Favorites (client saves workers)
-    Route::get('/task-favorites/{clientId}', [FavoriteController::class, 'index']);
-    Route::post('/task-favorites', [FavoriteController::class, 'store']);
+    // Favorites (client saves tasks)
+    Route::get('/task-favorites/{clientId}',             [FavoriteController::class, 'index']);
+    Route::post('/task-favorites',                       [FavoriteController::class, 'store']);
     Route::delete('/task-favorites/{clientId}/{taskId}', [FavoriteController::class, 'destroy']);
 });

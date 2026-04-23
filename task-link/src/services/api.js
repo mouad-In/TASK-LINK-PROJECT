@@ -178,16 +178,21 @@ export const reviewService = {
 };
 
 // Favorites Service
-// services/api.js
-export const taskFavoritesService = {
-  getFavoriteTasks: (clientId) => 
-    api.get(`/task-favorites/${clientId}`).then(res => res.data),
-  
-  addFavoriteTask: (clientId, taskId) => 
-    api.post('/task-favorites', { client_id: clientId, task_id: taskId }).then(res => res.data),
-  
-  removeFavoriteTask: (clientId, taskId) => 
-    api.delete(`/task-favorites/${clientId}/${taskId}`),
+export const favoritesService = {
+  async getFavorites(clientId) {
+    const response = await api.get(`/task-favorites/${clientId}`);
+    return response.data;
+  },
+
+  async addFavorite(clientId, taskId) {
+    const response = await api.post('/task-favorites', { client_id: clientId, task_id: taskId });
+    return response.data;
+  },
+
+  async removeFavorite(clientId, taskId) {
+    await api.delete(`/task-favorites/${clientId}/${taskId}`);
+    return true;
+  },
 };
 
 // Admin Service - NEW

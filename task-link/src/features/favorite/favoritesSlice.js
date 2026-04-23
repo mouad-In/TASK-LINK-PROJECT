@@ -1,82 +1,84 @@
-// store/client/taskFavoritesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { taskFavoritesService } from '@/services/api';
+import { favoritesService } from '@/services/api';
 
-const initialState = {
-  favoriteTasks: [],
-  isLoading: false,
-  error: null,
-};
+// ── Async Thunks ──────────────────────────────────────────────────────────────
 
 export const fetchFavoriteTasks = createAsyncThunk(
-  'taskFavorites/fetchFavoriteTasks',
+  'favorites/fetchFavoriteTasks',
   async (clientId, { rejectWithValue }) => {
     try {
-      return await taskFavoritesService.getFavoriteTasks(clientId);
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message);
+      return await favoritesService.getFavorites(clientId);
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
     }
   }
 );
 
 export const addToFavorites = createAsyncThunk(
-  'taskFavorites/addToFavorites',
+  'favorites/addToFavorites',
   async ({ clientId, taskId }, { rejectWithValue }) => {
     try {
-      return await taskFavoritesService.addFavoriteTask(clientId, taskId);
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message);
+      return await favoritesService.addFavorite(clientId, taskId);
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
     }
   }
 );
 
 export const removeFromFavorites = createAsyncThunk(
-  'taskFavorites/removeFromFavorites',
+  'favorites/removeFromFavorites',
   async ({ clientId, taskId }, { rejectWithValue }) => {
     try {
-      await taskFavoritesService.removeFavoriteTask(clientId, taskId);
+      await favoritesService.removeFavorite(clientId, taskId);
       return taskId;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || error.message);
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
     }
   }
 );
 
+// ── Slice ─────────────────────────────────────────────────────────────────────
+
 const favoritesSlice = createSlice({
-  name: 'taskFavorites',
-  initialState,
+  name: 'favorites',
+  initialState: {
+    favorites: [],
+    isLoading: false,
+    error: null,
+  },
   reducers: {
-    clearError: (state) => {
-      state.error = null;
-    },
+    clearFavoritesError: (state) => { state.error = null; },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch favorites
-      .addCase(fetchFavoriteTasks.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
+      // fetchFavoriteTasks
+      .addCase(fetchFavoriteTasks.pending,   (state) => { state.isLoading = true; state.error = null; })
       .addCase(fetchFavoriteTasks.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.favoriteTasks = action.payload;
+        state.favorites = Array.isArray(action.payload) ? action.payload : [];
       })
-      .addCase(fetchFavoriteTasks.rejected, (state, action) => {
+      .addCase(fetchFavoriteTasks.rejected,  (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       })
-      // Add to favorites
+
+      // addToFavorites
       .addCase(addToFavorites.fulfilled, (state, action) => {
-        state.favoriteTasks.push(action.payload);
+        if (!state.favorites) state.favorites = [];
+        if (action.payload) {
+          const exists = state.favorites.find((t) => t.id === action.payload.id);
+          if (!exists) state.favorites.unshift(action.payload);
+        }
       })
-      // Remove from favorites
+
+      // removeFromFavorites
       .addCase(removeFromFavorites.fulfilled, (state, action) => {
-        state.favoriteTasks = state.favoriteTasks.filter(
-          (task) => task.id !== action.payload
+        state.favorites = (state.favorites ?? []).filter(
+          (t) => String(t.id) !== String(action.payload)
         );
       });
   },
 });
 
-export const { clearError } = favoritesSlice.actions;
+export const { clearFavoritesError } = favoritesSlice.actions;
 export default favoritesSlice.reducer;
