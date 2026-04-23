@@ -18,6 +18,7 @@ export const fetchWorkerProfile = createAsyncThunk(
 export const fetchWorkerStats = createAsyncThunk(
     'worker/fetchWorkerStats',
     async (workerId, { rejectWithValue }) => {
+        if (!workerId) return rejectWithValue('Worker ID is required');
         try {
             const [tasks, reviews] = await Promise.all([
                 taskService.getTasksByWorker(workerId),
@@ -56,6 +57,7 @@ export const fetchWorkerStats = createAsyncThunk(
 export const fetchPerformanceMetrics = createAsyncThunk(
     'worker/fetchPerformanceMetrics',
     async (workerId, { rejectWithValue }) => {
+        if (!workerId) return rejectWithValue('Worker ID is required');
         try {
             const [tasks, reviews] = await Promise.all([
                 taskService.getTasksByWorker(workerId),

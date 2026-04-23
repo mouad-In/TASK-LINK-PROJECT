@@ -8,6 +8,7 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SavedTaskController;
+use App\Http\Controllers\FavoriteController;
 
 /*
 |--------------------------------------------------------------------------
@@ -77,4 +78,9 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/saved-tasks',             [SavedTaskController::class, 'index']);
     Route::post('/saved-tasks',            [SavedTaskController::class, 'store']);
     Route::delete('/saved-tasks/{task}',   [SavedTaskController::class, 'destroy']);
+
+    // Favorites (client saves workers)
+    Route::get('/favorites/{clientId}',              [FavoriteController::class, 'index']);
+    Route::post('/favorites',                        [FavoriteController::class, 'store']);
+    Route::delete('/favorites/{clientId}/{workerId}',[FavoriteController::class, 'destroy']);
 });

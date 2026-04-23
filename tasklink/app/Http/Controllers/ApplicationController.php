@@ -73,13 +73,13 @@ class ApplicationController extends Controller
             'taskId'       => 'required|integer|exists:tasks,id',
             'price'        => 'required|numeric|min:1',
             'deliveryTime' => 'required|string|max:100',
-            'message'      => 'required|string|min:10|max:1000',
+            'message'      => 'required|string|min:5|max:1000',
         ]);
 
         $task = Task::findOrFail($request->taskId);
 
-        // FIX: use 'published' not 'open'
-        if ($task->status !== 'published') {
+        // قبول التقديم على tasks بـ status published أو open
+        if (!in_array($task->status, ['published', 'open'])) {
             return response()->json(['message' => 'This task is no longer accepting applications'], 422);
         }
 

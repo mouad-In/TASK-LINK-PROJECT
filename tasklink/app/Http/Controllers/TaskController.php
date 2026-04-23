@@ -34,7 +34,7 @@ class TaskController extends Controller
     public function getPublished(): JsonResponse
     {
         $tasks = Task::with('applications')
-            ->where('status', 'published')
+            ->whereIn('status', ['published', 'open'])
             ->get();
 
         return response()->json($this->formatList($tasks));

@@ -52,7 +52,16 @@ export const createApplication = createAsyncThunk(
       const data = await applicationService.createApplication(applicationData);
       return data;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      // استخرج رسائل الـ validation من Laravel
+      const validationErrors = error.response?.data?.errors;
+      if (validationErrors) {
+        const firstError = Object.values(validationErrors)[0]?.[0];
+        return thunkAPI.rejectWithValue(firstError || 'Validation failed');
+      }
+      // رسائل Laravel العادية مثل "You have already applied"
+      return thunkAPI.rejectWithValue(
+        error.response?.data?.message || error.message
+      );
     }
   }
 );

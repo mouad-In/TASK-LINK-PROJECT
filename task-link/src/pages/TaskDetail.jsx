@@ -18,16 +18,8 @@ import {
   clearCurrentTask,
 } from '@/features/tasks/tasksSlice';
 
-import { createApplication } from '@/features/applications/applicationsSlice';
-
-// ── Mock Proposals (until you have a proposalsSlice) ──────────────────────────
-
-const MOCK_PROPOSALS = [
-  { id: 1, name: 'Alex Thompson',  avatar: 'AT', rating: 4.9, reviews: 45,  price: 140, message: 'Hi! I have 5+ years of professional cleaning experience. Available this week!',         completedTasks: 89  },
-  { id: 2, name: 'Maria Garcia',   avatar: 'MG', rating: 4.7, reviews: 32,  price: 155, message: 'Professional cleaner with great attention to detail. Free re-clean if not happy!',     completedTasks: 67  },
-  { id: 3, name: 'David Kim',      avatar: 'DK', rating: 5.0, reviews: 18,  price: 130, message: 'New to the platform but 8 years in the industry. References available.',               completedTasks: 18  },
-  { id: 4, name: 'Priya Patel',    avatar: 'PP', rating: 4.8, reviews: 56,  price: 160, message: 'Top-rated cleaner with eco-friendly approach. Fully insured and background checked.',  completedTasks: 112 },
-];
+import { createApplication, fetchApplicationsByWorker, fetchApplicationsByTask, updateApplicationStatus } from '@/features/applications/applicationsSlice';
+import { messageService } from '@/services/api';
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
@@ -45,39 +37,61 @@ const TaskDetails = () => {
   const currentUser = useSelector((state) => state.auth.user);
   const isClient = currentUser?.role === 'client';
 
+  // ✅ استخرج قيم ثابتة خارج الـ useEffect لتجنب تغيير حجم الـ dependency array
+  const currentUserId   = currentUser?.id   ?? null;
+  const currentUserRole = currentUser?.role ?? null;
+
+  // Check if this worker already applied — من applications ديالو هو
+  const applications = useSelector((state) => state.applications.applications);
+  const alreadyApplied = applications.some(
+    (app) => String(app.task_id) === String(id)
+  );
+
+  // للـ client: applications الحقيقية للمهمة
+  const taskApplications = useSelector((state) => state.applications.applications);
+
   // ── Local UI state ──
   const [saved,           setSaved]           = useState(false);
   const [showApplyForm,   setShowApplyForm]   = useState(false);
   const [proposalPrice,   setProposalPrice]   = useState('');
   const [proposalMessage, setProposalMessage] = useState('');
+  const [deliveryTime,    setDeliveryTime]    = useState('');
   const [isApplying,      setIsApplying]      = useState(false);
   const [applyError,      setApplyError]      = useState(null);
   const [applySuccess,    setApplySuccess]    = useState(false);
 
   // ── Fetch task on mount / id change ──
   useEffect(() => {
-    if (id) dispatch(fetchTaskById(id));
-
-    // Clean up currentTask when leaving the page
+    if (id) {
+      dispatch(fetchTaskById(id));
+      if (currentUserRole === 'worker' && currentUserId) {
+        dispatch(fetchApplicationsByWorker(currentUserId));
+      }
+      if (currentUserRole === 'client') {
+        dispatch(fetchApplicationsByTask(id));
+      }
+    }
     return () => dispatch(clearCurrentTask());
-  }, [id, dispatch]);
+  }, [id, dispatch, currentUserId, currentUserRole]);
 
   // ── Submit proposal handler ──
   const handleSubmitProposal = async () => {
-    if (!proposalPrice || !proposalMessage) return;
+    if (!proposalPrice || !proposalMessage || !deliveryTime) return;
     setIsApplying(true);
     setApplyError(null);
     try {
       const result = await dispatch(createApplication({
-        task_id: id,
-        price: proposalPrice,
-        message: proposalMessage,
+        taskId:       parseInt(id, 10),   // ✅ Backend يطلب integer
+        price:        parseFloat(proposalPrice),
+        deliveryTime: deliveryTime,
+        message:      proposalMessage,
       }));
       if (createApplication.fulfilled.match(result)) {
         setApplySuccess(true);
         setShowApplyForm(false);
         setProposalPrice('');
         setProposalMessage('');
+        setDeliveryTime('');
       } else {
         setApplyError(result.payload || 'Failed to submit proposal. Please try again.');
       }
@@ -86,7 +100,26 @@ const TaskDetails = () => {
     }
   };
 
-  // ── Loading ──
+  // ── Hire worker handler ──
+  const [hiringId, setHiringId] = useState(null);
+
+  const handleHireWorker = async (applicationId, workerId) => {
+    setHiringId(applicationId);
+    try {
+      // 1. قبول الـ application
+      await dispatch(updateApplicationStatus({ applicationId, status: 'accepted' }));
+
+      // 2. إنشاء أو جلب المحادثة مع الـ worker
+      const conversation = await messageService.getOrCreateConversation(currentUserId, workerId);
+
+      // 3. الانتقال لصفحة المحادثة
+      navigate(`/client/messages/${conversation.id}`);
+    } catch (err) {
+      console.error('Hire failed:', err);
+    } finally {
+      setHiringId(null);
+    }
+  };
   if (isLoading) {
     return (
       <div className="min-h-screen bg-muted/30 flex items-center justify-center">
@@ -239,49 +272,80 @@ const TaskDetails = () => {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-foreground text-lg">
-                    Proposals ({task.applicationsCount ?? MOCK_PROPOSALS.length})
+                    Proposals ({task.applicationsCount ?? taskApplications.length ?? 0})
                   </CardTitle>
                   {isClient && (
                     <span className="text-sm text-muted-foreground">
-                      {MOCK_PROPOSALS.length} workers interested
+                      {taskApplications.length} workers interested
                     </span>
                   )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {isClient ? (
-                  MOCK_PROPOSALS.map((proposal) => (
-                    <div key={proposal.id} className="p-4 rounded-xl border border-border hover:border-primary/30 transition-all bg-card">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
-                          {proposal.avatar}
+                  taskApplications.length > 0 ? (
+                    taskApplications.map((app) => {
+                      const worker = app.worker ?? {};
+                      const workerName = `${worker.first_name ?? ''} ${worker.last_name ?? ''}`.trim() || 'Worker';
+                      const initials = workerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                      return (
+                        <div key={app.id} className="p-4 rounded-xl border border-border hover:border-primary/30 transition-all bg-card">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-sm font-bold text-primary-foreground shrink-0">
+                              {worker.avatar
+                                ? <img src={worker.avatar} alt={workerName} className="w-full h-full rounded-full object-cover" />
+                                : initials}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <h3 className="font-semibold text-foreground">{workerName}</h3>
+                                <span className="text-lg font-bold text-foreground">${app.price}</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-sm text-muted-foreground mb-2">
+                                <span className="flex items-center gap-1">
+                                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                                  {worker.rating ?? 'N/A'}
+                                </span>
+                                <span>⏱ {app.delivery_time}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  app.status === 'pending'  ? 'bg-amber-100 text-amber-700' :
+                                  app.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>{app.status}</span>
+                              </div>
+                              <p className="text-sm text-foreground/70 mb-3">{app.message}</p>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  className="bg-gradient-to-r from-primary to-secondary text-primary-foreground"
+                                  disabled={hiringId === app.id || app.status === 'accepted'}
+                                  onClick={() => handleHireWorker(app.id, worker.id)}
+                                >
+                                  {hiringId === app.id ? 'Hiring...' : app.status === 'accepted' ? '✅ Hired' : 'Hire Now'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async () => {
+                                    const conv = await messageService.getOrCreateConversation(currentUserId, worker.id);
+                                    navigate(`/client/messages/${conv.id}`);
+                                  }}
+                                >
+                                  <MessageSquare className="w-4 h-4 mr-1" /> Chat
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <h3 className="font-semibold text-foreground">{proposal.name}</h3>
-                            <span className="text-lg font-bold text-foreground">${proposal.price}</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
-                            <span className="flex items-center gap-1">
-                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                              {proposal.rating}
-                            </span>
-                            <span>{proposal.reviews} reviews</span>
-                            <span>{proposal.completedTasks} tasks done</span>
-                          </div>
-                          <p className="text-sm text-foreground/70 mb-3">{proposal.message}</p>
-                          <div className="flex items-center gap-2">
-                            <Button size="sm" className="bg-gradient-to-r from-primary to-secondary text-primary-foreground">
-                              Hire Now
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <MessageSquare className="w-4 h-4 mr-1" /> Chat
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                      <p className="font-medium text-foreground">No proposals yet</p>
+                      <p className="text-sm mt-1">Workers will appear here once they apply</p>
                     </div>
-                  ))
+                  )
                 ) : (
                   <div className="text-center py-6 text-muted-foreground">
                     <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-50" />
@@ -329,6 +393,16 @@ const TaskDetails = () => {
                       />
                     </div>
                     <div>
+                      <label className="text-sm font-medium text-foreground mb-1.5 block">Delivery Time</label>
+                      <Input
+                        type="text"
+                        placeholder="e.g. 2 days, 1 week"
+                        value={deliveryTime}
+                        onChange={(e) => setDeliveryTime(e.target.value)}
+                        className="bg-muted border-border"
+                      />
+                    </div>
+                    <div>
                       <label className="text-sm font-medium text-foreground mb-1.5 block">Cover Letter</label>
                       <Textarea
                         placeholder="Why are you the best fit for this task?"
@@ -344,7 +418,7 @@ const TaskDetails = () => {
                     <Button
                       className="w-full bg-gradient-to-r from-primary to-secondary text-primary-foreground"
                       size="lg"
-                      disabled={!proposalPrice || !proposalMessage || isApplying}
+                      disabled={!proposalPrice || !proposalMessage || !deliveryTime || isApplying}
                       onClick={handleSubmitProposal}
                     >
                       <Send className="w-4 h-4 mr-2" />
@@ -354,7 +428,7 @@ const TaskDetails = () => {
                       Cancel
                     </Button>
                   </div>
-                ) : applySuccess ? (
+                ) : applySuccess || alreadyApplied ? (
                   <div className="text-center py-4 space-y-2">
                     <p className="text-emerald-500 font-semibold text-lg">✅ Proposal Submitted!</p>
                     <p className="text-sm text-muted-foreground">The client will review your proposal soon.</p>

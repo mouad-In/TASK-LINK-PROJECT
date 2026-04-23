@@ -24,7 +24,7 @@ import {
 import { cn } from '@/components/lib/utils';
 
 import {
-  fetchTasks,
+  fetchPublishedTasks,
   setFilters,
   clearFilters,
 } from '@/features/tasks/tasksSlice';
@@ -83,7 +83,7 @@ const FindTasks = () => {
 
   // ── Fetch on mount ──
   useEffect(() => {
-    dispatch(fetchTasks());
+    dispatch(fetchPublishedTasks());
     dispatch(fetchSavedTasks());
     return () => dispatch(clearFilters());
   }, [dispatch]);
@@ -182,7 +182,7 @@ const FindTasks = () => {
           <div className="text-destructive text-6xl mb-2">⚠️</div>
           <p className="text-destructive font-medium text-lg">Failed to load tasks</p>
           <p className="text-sm text-muted-foreground">{error}</p>
-          <Button variant="outline" onClick={() => dispatch(fetchTasks())} className="mt-2">
+          <Button variant="outline" onClick={() => dispatch(fetchPublishedTasks())} className="mt-2">
             Try Again
           </Button>
         </div>

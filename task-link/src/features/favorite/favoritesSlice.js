@@ -12,8 +12,7 @@ export const fetchFavoriteWorkers = createAsyncThunk(
   'favorites/fetchFavoriteWorkers',
   async (clientId, { rejectWithValue }) => {
     try {
-      const response = await favoritesService.getFavorites(clientId);
-      return response.data;
+      return await favoritesService.getFavorites(clientId);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -24,8 +23,7 @@ export const addToFavorites = createAsyncThunk(
   'favorites/addToFavorites',
   async ({ clientId, workerId }, { rejectWithValue }) => {
     try {
-      const response = await favoritesService.addFavorite(clientId, workerId);
-      return response.data;
+      return await favoritesService.addFavorite(clientId, workerId);
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -69,11 +67,15 @@ const favoritesSlice = createSlice({
       })
       // Add to Favorites
       .addCase(addToFavorites.fulfilled, (state, action) => {
-        state.favorites.unshift(action.payload);
+        if (!state.favorites) state.favorites = [];
+        if (action.payload) state.favorites.unshift(action.payload);
       })
       // Remove from Favorites
       .addCase(removeFromFavorites.fulfilled, (state, action) => {
-        state.favorites = state.favorites.filter(worker => worker.id !== action.payload);
+        if (!state.favorites) return;
+        state.favorites = state.favorites.filter(
+          (w) => String(w.id ?? w.worker_id) !== String(action.payload)
+        );
       });
   },
 });

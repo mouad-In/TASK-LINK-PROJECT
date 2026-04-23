@@ -26,7 +26,6 @@ import TaskDetails from "./pages/TaskDetail";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminTasks from "./pages/admin/AdminTasks";
-import MessagesWorker from "./pages/MessagesWrorker";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminSettings from "./pages/admin/AdminSettings";
 import { ThemeProvider } from "@/components/hooks/use-theme";
@@ -78,8 +77,8 @@ const App = () => {
                 <Route path="/worker/tasks" element={<FindTasks />} />
                 <Route path="/worker/tasks/:id" element={<TaskDetails />} />
                 <Route path="/worker/settings" element={<WorkerSettings />} />
-                <Route path="/worker/messages" element={<MessagesWorker />} />
-                <Route path="/worker/messages/:id" element={<MessagesWorker />} />
+                <Route path="/worker/messages" element={<Messages userType="worker" />} />
+                <Route path="/worker/messages/:id" element={<Messages userType="worker" />} />
                 <Route path="/worker/earnings" element={<WorkerDashboard />} />
                 <Route path="/worker/saved" element={<SavedTasks />} />
                 

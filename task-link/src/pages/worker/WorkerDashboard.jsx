@@ -34,6 +34,10 @@ const WorkerDashboard = () => {
   // Selectors for tasks
   const { tasks, isLoading: tasksLoading, error: tasksError } = useSelector((state) => state.tasks);
   const { profile, stats, performance, isLoading: workerLoading } = useSelector((state) => state.worker);
+
+  // ✅ اقرأ الـ ID من auth مباشرة — موجود دائماً من أول تحميل
+  const currentUser = useSelector((state) => state.auth.user);
+  const workerId = currentUser?.id;
   
   // Filter available tasks (open for applications)
   const availableTasks = tasks.filter(task => 
@@ -48,16 +52,17 @@ const WorkerDashboard = () => {
   ).slice(0, 3);
   
   useEffect(() => {
-    // Fetch data on component mount
     dispatch(fetchTasks({ status: 'open', per_page: 10 }));
-    dispatch(fetchWorkerStats(profile?.id));
-    dispatch(fetchPerformanceMetrics(profile?.id));
-  }, [dispatch, profile?.id]);
+    // ✅ فقط نبعث الطلب إذا عندنا ID حقيقي
+    if (workerId) {
+      dispatch(fetchWorkerStats(workerId));
+      dispatch(fetchPerformanceMetrics(workerId));
+    }
+  }, [dispatch, workerId]);
   
   const handleApplyForTask = async (taskId) => {
     try {
-      await dispatch(assignWorker({ taskId, workerId: profile?.id })).unwrap();
-      // Refresh tasks after assignment
+      await dispatch(assignWorker({ taskId, workerId })).unwrap();
       dispatch(fetchTasks({ status: 'open', per_page: 10 }));
     } catch (error) {
       console.error('Failed to apply for task:', error);
@@ -96,7 +101,7 @@ const WorkerDashboard = () => {
             <Button 
               onClick={() => {
                 dispatch(fetchTasks({ status: 'open', per_page: 10 }));
-                dispatch(fetchWorkerStats(profile?.id));
+                if (workerId) dispatch(fetchWorkerStats(workerId));
               }}
               className="mt-4"
             >

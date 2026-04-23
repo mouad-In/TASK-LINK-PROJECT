@@ -71,6 +71,18 @@ export const fetchTasks = createAsyncThunk(
   }
 );
 
+/** GET /api/tasks/published  — workers browse all open tasks */
+export const fetchPublishedTasks = createAsyncThunk(
+  'tasks/fetchPublishedTasks',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await taskService.getPublishedTasks();
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
 /** GET /api/tasks/:id */
 export const fetchTaskById = createAsyncThunk(
   'tasks/fetchTaskById',
@@ -162,6 +174,22 @@ const tasksSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // ── Fetch Published Tasks (workers browse) ───────────────────────────
+      .addCase(fetchPublishedTasks.pending, (state) => {
+        state.isLoading = true;
+        state.error     = null;
+      })
+      .addCase(fetchPublishedTasks.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const raw = Array.isArray(action.payload) ? action.payload : action.payload?.data ?? [];
+        state.tasks         = raw.map(normalize);
+        state.filteredTasks = applyFilters(state.tasks, state.filters);
+      })
+      .addCase(fetchPublishedTasks.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error     = action.payload;
+      })
+
       // ── Fetch All Tasks ──────────────────────────────────────────────────
       .addCase(fetchTasks.pending, (state) => {
         state.isLoading = true;

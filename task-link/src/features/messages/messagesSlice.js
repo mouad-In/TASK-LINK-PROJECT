@@ -1,87 +1,115 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { messageService } from '@/services/api';
+
+// ── Async Thunks ──────────────────────────────────────────────────────────────
+
+export const fetchConversations = createAsyncThunk(
+  'messages/fetchConversations',
+  async (userId, { rejectWithValue }) => {
+    try {
+      return await messageService.getConversations(userId);
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const fetchMessages = createAsyncThunk(
+  'messages/fetchMessages',
+  async (conversationId, { rejectWithValue }) => {
+    try {
+      return await messageService.getMessages(conversationId);
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const sendMessage = createAsyncThunk(
+  'messages/sendMessage',
+  async ({ conversationId, content }, { rejectWithValue }) => {
+    try {
+      return await messageService.sendMessage({ conversationId, content });
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+export const getOrCreateConversation = createAsyncThunk(
+  'messages/getOrCreateConversation',
+  async ({ participant1Id, participant2Id }, { rejectWithValue }) => {
+    try {
+      return await messageService.getOrCreateConversation(participant1Id, participant2Id);
+    } catch (err) {
+      return rejectWithValue(err.response?.data?.message || err.message);
+    }
+  }
+);
+
+// ── Slice ─────────────────────────────────────────────────────────────────────
 
 const initialState = {
-  conversations: [],
+  conversations:      [],
   activeConversation: null,
+  messages:           [],
+  isLoading:          false,
+  isSending:          false,
+  error:              null,
 };
 
 const messagesSlice = createSlice({
   name: 'messages',
   initialState,
   reducers: {
-    setConversations: (state, action) => {
-      state.conversations = action.payload;
-    },
-
     setActiveConversation: (state, action) => {
       state.activeConversation = action.payload;
+      state.messages = [];
     },
-
-    addMessage: (state, action) => {
-      const { conversationId, message } = action.payload;
-
-      // أضف الرسالة للمحادثة في القائمة
-      const conversation = state.conversations.find(c => c.id === conversationId);
-      if (conversation) {
-        conversation.messages.push(message);
-        conversation.lastMessage = message.text;
-        conversation.time = message.time;
-      }
-
-      // أضف الرسالة للمحادثة الفعّالة
-      if (state.activeConversation?.id === conversationId) {
-        state.activeConversation.messages.push(message);
-        state.activeConversation.lastMessage = message.text;
-        state.activeConversation.time = message.time;
-      }
+    clearMessages: (state) => {
+      state.messages = [];
     },
-
-    updateMessageStatus: (state, action) => {
-      const { conversationId, messageId, status } = action.payload;
-
-      const conversation = state.conversations.find(c => c.id === conversationId);
-      if (conversation) {
-        const message = conversation.messages.find(m => m.id === messageId);
-        if (message) message.status = status;
-      }
-
-      if (state.activeConversation?.id === conversationId) {
-        const message = state.activeConversation.messages.find(m => m.id === messageId);
-        if (message) message.status = status;
-      }
+    setConversations:    (state, action) => { state.conversations = action.payload; },
+    addMessage:          (state, action) => { state.messages.push(action.payload.message ?? action.payload); },
+    markConversationRead:(state, action) => {
+      const c = state.conversations.find(c => c.id === action.payload);
+      if (c) c.unreadCount = 0;
     },
+    setTypingStatus:     () => {},
+    updateMessageStatus: () => {},
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchConversations.pending,   (state) => { state.isLoading = true; state.error = null; })
+      .addCase(fetchConversations.fulfilled, (state, action) => { state.isLoading = false; state.conversations = action.payload; })
+      .addCase(fetchConversations.rejected,  (state, action) => { state.isLoading = false; state.error = action.payload; })
 
-    markConversationRead: (state, action) => {
-      const conversationId = action.payload;
+      .addCase(fetchMessages.pending,   (state) => { state.isLoading = true; })
+      .addCase(fetchMessages.fulfilled, (state, action) => { state.isLoading = false; state.messages = action.payload; })
+      .addCase(fetchMessages.rejected,  (state, action) => { state.isLoading = false; state.error = action.payload; })
 
-      const conversation = state.conversations.find(c => c.id === conversationId);
-      if (conversation) conversation.unread = 0;
+      .addCase(sendMessage.pending,   (state) => { state.isSending = true; })
+      .addCase(sendMessage.fulfilled, (state, action) => {
+        state.isSending = false;
+        state.messages.push(action.payload);
+        const convId = action.payload.conversationId ?? action.payload.conversation_id;
+        const conv = state.conversations.find(c => c.id === convId);
+        if (conv) { conv.last_message = action.payload.content; conv.last_message_time = action.payload.createdAt ?? action.payload.created_at; }
+      })
+      .addCase(sendMessage.rejected, (state) => { state.isSending = false; })
 
-      if (state.activeConversation?.id === conversationId) {
-        state.activeConversation.unread = 0;
-      }
-    },
-
-    setTypingStatus: (state, action) => {
-      const { conversationId, isTyping } = action.payload;
-
-      const conversation = state.conversations.find(c => c.id === conversationId);
-      if (conversation) conversation.typing = isTyping;
-
-      if (state.activeConversation?.id === conversationId) {
-        state.activeConversation.typing = isTyping;
-      }
-    },
+      .addCase(getOrCreateConversation.fulfilled, (state, action) => {
+        const exists = state.conversations.find(c => c.id === action.payload.id);
+        if (!exists) state.conversations.unshift(action.payload);
+        state.activeConversation = action.payload;
+      });
   },
 });
 
 export const {
-  setConversations,
-  setActiveConversation,
-  addMessage,
-  updateMessageStatus,
-  markConversationRead,
-  setTypingStatus,
+  setActiveConversation, clearMessages,
+  setConversations, addMessage,
+  markConversationRead, setTypingStatus, updateMessageStatus,
 } = messagesSlice.actions;
 
 export default messagesSlice.reducer;

@@ -11,13 +11,10 @@ const api = axios.create({
 // 🔐 REQUEST INTERCEPTOR
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token'); // ✅ يقرأ token مباشرة
-    console.log("TOKEN:", token);
-
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -29,16 +26,15 @@ api.interceptors.response.use(
   (error) => {
     // Laravel validation error (422)
     if (error.response?.status === 422) {
-      console.log('Validation errors:', error.response.data.errors);
+      console.log('Validation errors:', error.response.data?.errors || error.response.data?.message);
     }
 
     // Unauthorized — token expired أو غير صالح
     if (error.response?.status === 401) {
-      localStorage.removeItem('token'); // ✅
-      localStorage.removeItem('user');  // ✅
-
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      if (window.location.pathname !== '/auth') {
+        window.location.href = '/auth';
       }
     }
 
